@@ -83,10 +83,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trigger_insights_updated_at
-    BEFORE UPDATE ON insights
-    FOR EACH ROW
-    EXECUTE FUNCTION update_insights_updated_at();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_insights_updated_at') THEN
+        CREATE TRIGGER trigger_insights_updated_at
+            BEFORE UPDATE ON insights
+            FOR EACH ROW
+            EXECUTE FUNCTION update_insights_updated_at();
+    END IF;
+END $$;
 
 -- Update updated_at timestamp on rotation_state
 CREATE OR REPLACE FUNCTION update_rotation_state_updated_at()
@@ -97,10 +102,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trigger_rotation_state_updated_at
-    BEFORE UPDATE ON rotation_state
-    FOR EACH ROW
-    EXECUTE FUNCTION update_rotation_state_updated_at();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_rotation_state_updated_at') THEN
+        CREATE TRIGGER trigger_rotation_state_updated_at
+            BEFORE UPDATE ON rotation_state
+            FOR EACH ROW
+            EXECUTE FUNCTION update_rotation_state_updated_at();
+    END IF;
+END $$;
 
 -- ============================================
 -- CLEANUP FUNCTION (optional, run periodically)
@@ -119,17 +129,18 @@ $$ LANGUAGE plpgsql;
 -- SAMPLE DATA (optional, for testing)
 -- ============================================
 -- Uncomment below to insert sample insights
+-- Note: Use $$ quoting for text containing single quotes
 
 -- INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
 -- VALUES (
 --     'Golang',
 --     'beginner',
 --     'Understanding Goroutine',
---     'Goroutine adalah thread ringan yang dikelola oleh Go runtime. Goroutine memungkinkan eksekusi concurrent dengan biaya memory yang sangat kecil (mulai dari 2KB) dibandingkan thread OS (1MB).',
---     '["Goroutine lebih ringan dari thread OS", "Dikelola oleh Go runtime", "Mudah dibuat dengan keyword go"]',
+--     $$Goroutine adalah thread ringan yang dikelola oleh Go runtime. Goroutine memungkinkan eksekusi concurrent dengan biaya memory yang sangat kecil (mulai dari 2KB) dibandingkan thread OS (1MB).$$,
+--     ARRAY['Goroutine lebih ringan dari thread OS', 'Dikelola oleh Go runtime', 'Mudah dibuat dengan keyword go'],
 --     'go func() { fmt.Println("Hello") }()',
---     '[{"q":"Bagaimana cara membuat goroutine?", "a":"Gunakan keyword go sebelum fungsi: go myFunction()"}, {"q":"Apa perbedaan goroutine dan thread?", "a":"Goroutine lebih ringan, dikelola runtime, multiplexed ke thread OS"}]',
---     '["golang", "concurrency", "goroutine"]
+--     '[{"q":"Bagaimana cara membuat goroutine?", "a":"Gunakan keyword go sebelum fungsi: go myFunction()"}, {"q":"Apa perbedaan goroutine dan thread?", "a":"Goroutine lebih ringan, dikelola runtime, multiplexed ke thread OS"}]'::jsonb,
+--     ARRAY['golang', 'concurrency', 'goroutine']
 -- );
 
 -- INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
@@ -137,11 +148,11 @@ $$ LANGUAGE plpgsql;
 --     'Database',
 --     'intermediate',
 --     'Transaction Isolation Levels',
---     'Transaction isolation level menentukan seberapa satu transaksi terisolasi dari transaksi lain. PostgreSQL menyediakan 4 level: Read Uncommitted, Read Committed, Repeatable Read, dan Serializable.',
---     '["Read Committed adalah default di PostgreSQL", "Serializable memberikan isolation tertinggi", "Semakin tinggi isolation, semakin besar overhead"]',
+--     $$Transaction isolation level menentukan seberapa satu transaksi terisolasi dari transaksi lain. PostgreSQL menyediakan 4 level: Read Uncommitted, Read Committed, Repeatable Read, dan Serializable.$$,
+--     ARRAY['Read Committed adalah default di PostgreSQL', 'Serializable memberikan isolation tertinggi', 'Semakin tinggi isolation, semakin besar overhead'],
 --     'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;',
---     '[{"q":"Apa perbedaan Read Committed dan Repeatable Read?", "a":"Read Committed hanya melindungi dari dirty read, Repeatable Read melindungi dari non-repeatable read"}, {"q":"Apa itu dirty read?", "a":"Membaca data yang belum di-commit dari transaksi lain"}]',
---     '["database", "postgresql", "transaction", "isolation"]
+--     '[{"q":"Apa perbedaan Read Committed dan Repeatable Read?", "a":"Read Committed hanya melindungi dari dirty read, Repeatable Read melindungi dari non-repeatable read"}, {"q":"Apa itu dirty read?", "a":"Membaca data yang belum di-commit dari transaksi lain"}]'::jsonb,
+--     ARRAY['database', 'postgresql', 'transaction', 'isolation']
 -- );
 
 -- INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
@@ -149,9 +160,29 @@ $$ LANGUAGE plpgsql;
 --     'System Design',
 --     'advanced',
 --     'CAP Theorem Deep Dive',
---     'CAP Theorem menyatakan bahwa distributed system hanya bisa memenuhi 2 dari 3 properti: Consistency (semua node melihat data yang sama), Availability (setiap request mendapatkan response), Partition Tolerance (system tetap berjalan meskipun ada network partition).',
---     '["Partition Tolerance adalah mandatory dalam distributed system", "CP vs AP trade-off tergantung use case", "Tidak ada sistem yang pure CAP di real world"]',
+--     $$CAP Theorem menyatakan bahwa distributed system hanya bisa memenuhi 2 dari 3 properti: Consistency (semua node melihat data yang sama), Availability (setiap request mendapatkan response), Partition Tolerance (system tetap berjalan meskipun ada network partition).$$,
+--     ARRAY['Partition Tolerance adalah mandatory dalam distributed system', 'CP vs AP trade-off tergantung use case', 'Tidak ada sistem yang pure CAP di real world'],
 --     '// CP System: etcd, ZooKeeper\n// AP System: Cassandra, DynamoDB',
---     '[{"q":"Bagaimana cara trade-off CAP?", "a":"Pilih CP jika konsistensi critical (financial), AP jika availability critical (social media)"}, {"q":"Apa yang dimaksud dengan eventual consistency?", "a":"Sistem yang akhirnya konsisten setelah partition healed, tapi tidak ada jaminan waktu"}]',
---     '["system-design", "cap-theorem", "distributed"]
+--     '[{"q":"Bagaimana cara trade-off CAP?", "a":"Pilih CP jika konsistensi critical (financial), AP jika availability critical (social media)"}, {"q":"Apa yang dimaksud dengan eventual consistency?", "a":"Sistem yang akhirnya konsisten setelah partition healed, tapi tidak ada jaminan waktu"}]'::jsonb,
+--     ARRAY['system-design', 'cap-theorem', 'distributed']
 -- );
+
+-- ============================================
+-- ROTATION STATE (initial data for 13 categories)
+-- ============================================
+-- Uncomment below to insert initial rotation state
+
+-- INSERT INTO rotation_state (category, last_sent_at, total_sent, last_level) VALUES
+--     ('Golang', NULL, 0, NULL),
+--     ('Data Structures & Algorithms', NULL, 0, NULL),
+--     ('Coding Challenge', NULL, 0, NULL),
+--     ('Database', NULL, 0, NULL),
+--     ('System Design', NULL, 0, NULL),
+--     ('API Design', NULL, 0, NULL),
+--     ('Deployment / DevOps', NULL, 0, NULL),
+--     ('Security', NULL, 0, NULL),
+--     ('Network', NULL, 0, NULL),
+--     ('Caching (Redis)', NULL, 0, NULL),
+--     ('Message Broker (Kafka)', NULL, 0, NULL),
+--     ('Distributed Systems', NULL, 0, NULL),
+--     ('AI/ML untuk Backend Engineer', NULL, 0, NULL);

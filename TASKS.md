@@ -9,29 +9,29 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 ## Fase 1: Project Foundation (Setup)
 
 ### Task 1.1 — Initialize Go Module & Dependencies
-- [ ] `go mod tidy` untuk download semua dependencies
-- [ ] Buat `go.sum` (lock file)
-- [ ] Verifikasi semua package bisa di-import
-- [ ] Setup linter (golangci-lint) — optional
+- [x] `go mod tidy` untuk download semua dependencies
+- [x] Buat `go.sum` (lock file)
+- [x] Verifikasi semua package bisa di-import
+- [x] Setup linter (golangci-lint) — optional
 
 **Files:** `go.mod`, `go.sum`  
 **Dependencies:** Semua package di go.mod  
 **Estimasi:** 15 menit
 
 ### Task 1.2 — Database Migration di Supabase
-- [ ] Buka Supabase SQL Editor
-- [ ] Jalankan `migrations/001_init.sql`
-- [ ] Verifikasi 4 table terbuat: `insights`, `delivery_log`, `rotation_state`, `sent_history`
-- [ ] Test koneksi dari lokal: `psql $DATABASE_URL -c "SELECT 1"`
+- [x] Buka Supabase SQL Editor
+- [x] Jalankan `migrations/001_init.sql`
+- [x] Verifikasi 4 table terbuat: `insights`, `delivery_log`, `rotation_state`, `sent_history`
+- [x] Test koneksi dari lokal: `psql $DATABASE_URL -c "SELECT 1"`
 
 **Files:** `migrations/001_init.sql`  
 **Dependencies:** Supabase project aktif  
 **Estimasi:** 10 menit
 
 ### Task 1.3 — Seed Initial Data
-- [ ] Insert sample insights (3-5 baris) untuk testing
-- [ ] Insert rotation_state untuk 13 kategori
-- [ ] Verifikasi data dengan SELECT queries
+- [x] Insert sample insights (3-5 baris) untuk testing
+- [x] Insert rotation_state untuk 13 kategori
+- [x] Verifikasi data dengan SELECT queries
 
 **Files:** `migrations/001_init.sql` (bagian seed)  
 **Dependencies:** Task 1.2  
