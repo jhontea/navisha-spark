@@ -9,10 +9,11 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.9.4
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	golang.org/x/sys v0.29.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

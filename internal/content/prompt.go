@@ -35,19 +35,19 @@ func NewPromptBuilder(cfg PromptConfig) *PromptBuilder {
 func (pb *PromptBuilder) BuildInsightPrompt(category, level, subtopic string) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf(`Generate a %s level learning insight about %s topic: %s.
+	b.WriteString(fmt.Sprintf(`Buatkan insight pembelajaran level %s tentang topik %s: %s dalam bahasa Indonesia.
 
 Requirements:
-1. Title: Clear and specific (max 100 chars)
-2. Insight: Comprehensive explanation (300-500 words) with:
-   - Definition and core concepts
-   - Practical examples and use cases
-   - Code snippets if applicable
-   - When to use / when not to use
-   - Common pitfalls and best practices
-3. Key Points: 3-5 bullet points summarizing the insight
-4. Follow-ups: 2-3 questions with detailed answers (each answer 100-200 words)
-5. Tags: 3-5 relevant tags
+1. Title: Jelas dan spesifik (maks 100 karakter)
+2. Insight: Penjelasan komprehensif (300-500 kata) dengan:
+   - Definisi dan konsep inti
+   - Contoh praktis dan use case
+   - Code snippets jika applicable
+   - Kapan menggunakan dan kapan tidak menggunakan
+   - Common pitfalls dan best practices
+3. Key Points: 3-5 bullet points yang merangkum insight
+4. Follow-ups: 2-3 pertanyaan dengan jawaban detail (masing-masing 100-200 kata)
+5. Tags: 3-5 tag yang relevan
 
 Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 {
@@ -68,18 +68,18 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 func (pb *PromptBuilder) BuildVariationPrompt(category, level string, existingInsight string) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf(`Create a variation of the following %s level insight about %s.
-The variation should cover a related but different aspect or angle of the same topic.
+	b.WriteString(fmt.Sprintf(`Buatkan variasi dari insight %s level tentang %s berikut dalam bahasa Indonesia.
+Variasi ini harus mencakup aspek atau sudut pandang yang berbeda tetapi terkait dengan topik yang sama.
 
-Original insight:
+Insight asli:
 %s
 
 Requirements:
-1. Title: Different from the original (max 100 chars)
-2. Insight: Comprehensive explanation (300-500 words) covering a different aspect
+1. Title: Berbeda dari asli (maks 100 karakter)
+2. Insight: Penjelasan komprehensif (300-500 kata) yang mencakup aspek berbeda
 3. Key Points: 3-5 bullet points
-4. Follow-ups: 2-3 questions with answers
-5. Tags: 3-5 relevant tags
+4. Follow-ups: 2-3 pertanyaan dengan jawaban
+5. Tags: 3-5 tag yang relevan
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -100,15 +100,15 @@ Respond ONLY with valid JSON in this exact format:
 func (pb *PromptBuilder) BuildFollowUpPrompt(category, level, title, insight string) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf(`Generate 2-3 follow-up questions with detailed answers for the following %s level insight about %s.
+	b.WriteString(fmt.Sprintf(`Buatkan 2-3 pertanyaan follow-up dengan jawaban detail untuk insight %s level tentang %s berikut dalam bahasa Indonesia.
 
 Title: %s
 Insight: %s
 
 Requirements:
-- Each question should test deeper understanding
-- Each answer should be 100-200 words
-- Cover practical implications and edge cases
+- Setiap pertanyaan harus menguji pemahaman yang lebih dalam
+- Setiap jawaban harus 100-200 kata
+- Sertakan implikasi praktis dan edge cases
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -123,7 +123,7 @@ Respond ONLY with valid JSON in this exact format:
 
 // BuildSystemPrompt builds the system prompt for the LLM.
 func (pb *PromptBuilder) BuildSystemPrompt() string {
-	return `You are a senior backend engineering tutor creating high-quality learning content. 
+	return `You are a senior backend engineering tutor creating high-quality learning content in Indonesian language.
 Your audience is experienced backend engineers who want to deepen their knowledge.
 
 Guidelines:
@@ -131,7 +131,7 @@ Guidelines:
 2. Include practical, real-world examples
 3. Explain trade-offs and when to use different approaches
 4. Focus on concepts that matter for senior-level understanding
-5. Use clear, professional language
+5. Use clear, professional Indonesian language
 6. Include code examples in Go when relevant
 7. Always provide code examples in proper syntax without markdown formatting
 

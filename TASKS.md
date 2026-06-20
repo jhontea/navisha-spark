@@ -162,12 +162,12 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 ## Fase 3: Application Entry Point
 
 ### Task 3.1 — Main Application
-- [ ] Buat `cmd/spark/main.go` — entry point
-- [ ] Inisialisasi semua service
-- [ ] Setup graceful shutdown (SIGINT/SIGTERM)
-- [ ] Setup health check endpoint (`/healthz`)
-- [ ] Setup scheduler
-- [ ] Logging startup
+- [x] Buat `cmd/spark/main.go` — entry point
+- [x] Inisialisasi semua service
+- [x] Setup graceful shutdown (SIGINT/SIGTERM)
+- [x] Setup health check endpoint (`/healthz`)
+- [x] Setup scheduler
+- [x] Logging startup
 
 **Files:**
 - `cmd/spark/main.go`
@@ -176,11 +176,11 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 3 jam
 
 ### Task 3.2 — HTTP Server (Health Check)
-- [ ] Buat HTTP server untuk health check
-- [ ] Implementasi endpoint `GET /healthz`
-- [ ] Cek database connection
-- [ ] Cek Telegram API reachability
-- [ ] Return JSON response
+- [x] Buat HTTP server untuk health check
+- [x] Implementasi endpoint `GET /healthz`
+- [x] Cek database connection
+- [x] Cek Telegram API reachability
+- [x] Return JSON response
 
 **Files:** (bagian dari `cmd/spark/main.go` atau `internal/http/server.go`)  
 **Dependencies:** Task 3.1  

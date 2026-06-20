@@ -75,7 +75,7 @@ func (f *Formatter) Format(data *InsightData) string {
 
 	// Insight section
 	b.WriteString("📝 *Insight:*\n")
-	b.WriteString(escapeMarkdown(data.Insight))
+	b.WriteString(formatParagraphs(data.Insight))
 	b.WriteString("\n\n")
 
 	// Key points
@@ -151,9 +151,34 @@ func formatLevel(level string) string {
 	return fmt.Sprintf("%s %s", emoji, level)
 }
 
+// formatParagraphs formats text with proper paragraph breaks for better readability.
+// It ensures paragraphs are separated by single newlines and removes excessive whitespace.
+func formatParagraphs(text string) string {
+	// First escape markdown
+	escaped := escapeMarkdown(text)
+
+	// Split by double newlines to identify paragraphs
+	paragraphs := strings.Split(escaped, "\n\n")
+
+	// Clean up each paragraph and join with single newlines
+	var cleaned []string
+	for _, p := range paragraphs {
+		// Trim whitespace from each paragraph
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			// Replace multiple consecutive newlines with single newline within paragraph
+			cleanedPara := strings.ReplaceAll(trimmed, "\n\n", "\n")
+			cleaned = append(cleaned, cleanedPara)
+		}
+	}
+
+	// Join paragraphs with double newline for visual separation
+	return strings.Join(cleaned, "\n\n")
+}
+
 // escapeMarkdown escapes Telegram Markdown special characters.
 func escapeMarkdown(text string) string {
-	// Characters to escape in Markdown: _ * [ ] ( ) ~ ` > # + - = | { } . !
+	// Characters to escape in Markdown: _ * [ ] ( ) ~ ` > # + - = | { } !
 	replacer := strings.NewReplacer(
 		"_", "\\_",
 		"*", "\\*",
@@ -171,7 +196,6 @@ func escapeMarkdown(text string) string {
 		"|", "\\|",
 		"{", "\\{",
 		"}", "\\}",
-		".", "\\.",
 		"!", "\\!",
 	)
 	return replacer.Replace(text)
