@@ -1,0 +1,271 @@
+# Navisha Spark — Unified Configuration
+# Edit this file and changes will hot-reload automatically (no restart needed)
+
+# ============================================
+# Application
+# ============================================
+app:
+  name: "navisha-spark"
+  env: "production"
+  port: 8080
+  log_level: "info"
+
+# ============================================
+# Telegram
+# ============================================
+telegram:
+  bot_token: ""              # Override via TELEGRAM_BOT_TOKEN env
+  chat_id: 0                 # Override via TELEGRAM_CHAT_ID env
+  parse_mode: "Markdown"
+  disable_web_page_preview: true
+  disable_notification: false
+
+# ============================================
+# Database (Supabase PostgreSQL)
+# ============================================
+database:
+  url: ""                    # Override via DATABASE_URL env
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+# ============================================
+# LLM / Content Generation (OpenRouter)
+# ============================================
+llm:
+  api_key: ""                # Override via OPENROUTER_API_KEY env
+  model: "openrouter/owl-alpha"
+  max_tokens: 1000
+  temperature: 0.7
+  primary_source: "database"
+  fallback_source: "llm"
+
+# ============================================
+# Schedule
+# ============================================
+schedule:
+  cron: "0 */3 * * *"        # Every 3 hours
+  timezone: "Asia/Jakarta"
+  active_hours:
+    start: 0                  # 00:00 WIB
+    end: 23                   # 23:00 WIB
+
+# ============================================
+# Rotation & Spaced Repetition
+# ============================================
+rotation:
+  level_distribution:
+    beginner: 20
+    intermediate: 50
+    advanced: 30
+  min_days_before_repeat: 7
+  weighted_round_robin:
+    enabled: true
+    default_weight: 1.0
+
+# ============================================
+# Deduplication
+# ============================================
+deduplication:
+  window_hours: 24
+
+# ============================================
+# Retry
+# ============================================
+retry:
+  max_retries: 3
+  delays:
+    - 1m
+    - 5m
+    - 15m
+
+# ============================================
+# Message Format
+# ============================================
+format:
+  include_category: true
+  include_level: true
+  include_follow_ups: true
+  include_tags: true
+  markdown_enabled: true
+
+# ============================================
+# Logging
+# ============================================
+logging:
+  level: "info"              # debug, info, warn, error
+  format: "json"             # json or text
+
+# ============================================
+# Topic Categories (13 categories)
+# ============================================
+categories:
+  - name: "Golang"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "concurrency"
+      - "goroutine/channel"
+      - "GMP scheduler"
+      - "slice"
+      - "generics"
+      - "profiling"
+      - "interface"
+      - "error handling"
+      - "context package"
+      - "testing"
+
+  - name: "Data Structures & Algorithms"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "array/tree/graph"
+      - "dynamic programming"
+      - "complexity analysis"
+      - "sorting algorithms"
+      - "searching algorithms"
+      - "hash table"
+      - "linked list"
+      - "stack/queue"
+
+  - name: "Coding Challenge"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "worker pool"
+      - "pipeline"
+      - "circuit breaker"
+      - "rate limiter"
+      - "producer-consumer"
+      - "fan-out/fan-in"
+      - "throttling"
+
+  - name: "Database"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "indexing"
+      - "query planning"
+      - "replication"
+      - "transaction isolation"
+      - "ACID properties"
+      - "normalization"
+      - "sharding"
+      - "connection pooling"
+
+  - name: "System Design"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "CAP theorem"
+      - "consistent hashing"
+      - "saga pattern"
+      - "2PC/3PC"
+      - "idempotency"
+      - "rate limiting"
+      - "circuit breaker"
+      - "load balancing"
+
+  - name: "API Design"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "REST vs GraphQL"
+      - "versioning"
+      - "rate limiting"
+      - "gateway/BFF"
+      - "authentication"
+      - "authorization"
+      - "webhook"
+      - "websocket"
+
+  - name: "Deployment / DevOps"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "CI/CD"
+      - "Kubernetes"
+      - "GitOps"
+      - "multi-region"
+      - "disaster recovery"
+      - "blue-green deployment"
+      - "canary release"
+      - "infrastructure as code"
+
+  - name: "Security"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "authn/authz"
+      - "JWT"
+      - "CSRF"
+      - "IDOR"
+      - "OAuth 2.0"
+      - "secrets management"
+      - "encryption"
+      - "OWASP Top 10"
+
+  - name: "Network"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "TCP/IP"
+      - "HTTP internals"
+      - "DNS"
+      - "load balancing"
+      - "TLS handshake"
+      - "HTTP/2"
+      - "gRPC"
+      - "CDN"
+
+  - name: "Caching (Redis)"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "caching strategy"
+      - "distributed lock"
+      - "cluster"
+      - "pub/sub"
+      - "streams"
+      - "cache invalidation"
+      - "cache aside"
+      - "write-through"
+
+  - name: "Message Broker (Kafka)"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "partition"
+      - "consumer group"
+      - "exactly-once"
+      - "KRaft"
+      - "producer/consumer"
+      - "topic/partition"
+      - "offset management"
+      - "stream processing"
+
+  - name: "Distributed Systems"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "consensus"
+      - "replication"
+      - "partition tolerance"
+      - "failure modes"
+      - "leader election"
+      - "vector clock"
+      - "gossip protocol"
+      - "eventual consistency"
+
+  - name: "AI/ML untuk Backend Engineer"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "dasar LLM"
+      - "vector DB"
+      - "RAG"
+      - "ML system design"
+      - "prompt engineering"
+      - "embedding"
+      - "fine-tuning"
+      - "inference optimization"

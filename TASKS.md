@@ -42,11 +42,11 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 ## Fase 2: Core Library (internal/)
 
 ### Task 2.1 — Config Package
-- [ ] Buat `internal/config/config.go` — struct definitions
-- [ ] Buat `internal/config/loader.go` — load dari env + YAML
-- [ ] Buat `internal/config/types.go` — type definitions
-- [ ] Implementasi hot-reload dengan fsnotify
-- [ ] Unit test untuk config loading
+- [x] Buat `internal/config/config.go` — struct definitions
+- [x] Buat `internal/config/loader.go` — load dari env + YAML
+- [x] Buat `internal/config/types.go` — type definitions
+- [x] Implementasi hot-reload dengan fsnotify
+- [x] Unit test untuk config loading
 
 **Files:**
 - `internal/config/config.go`
@@ -58,13 +58,13 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 2 jam
 
 ### Task 2.2 — Database Package
-- [ ] Buat `internal/database/connection.go` — koneksi pool
-- [ ] Buat `internal/database/repository/insight.go` — CRUD insights
-- [ ] Buat `internal/database/repository/delivery.go` — delivery log
-- [ ] Buat `internal/database/repository/rotation.go` — rotation state
-- [ ] Buat `internal/database/repository/history.go` — sent history
-- [ ] Buat `internal/database/migration/runner.go` — migration runner
-- [ ] Unit test dengan test database
+- [x] Buat `internal/database/connection.go` — koneksi pool
+- [x] Buat `internal/database/repository/insight.go` — CRUD insights
+- [x] Buat `internal/database/repository/delivery.go` — delivery log
+- [x] Buat `internal/database/repository/rotation.go` — rotation state
+- [x] Buat `internal/database/repository/history.go` — sent history
+- [x] Buat `internal/database/migration/runner.go` — migration runner
+- [x] Unit test dengan test database
 
 **Files:**
 - `internal/database/connection.go`
@@ -78,11 +78,11 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 4 jam
 
 ### Task 2.3 — Telegram Package
-- [ ] Buat `internal/telegram/client.go` — bot client
-- [ ] Buat `internal/telegram/formatter.go` — Markdown formatter untuk insight
-- [ ] Buat `internal/telegram/whitelist.go` — chat ID validation
-- [ ] Implementasi format pesan: title, insight, key_points, follow_ups (Q&A)
-- [ ] Unit test dengan mock
+- [x] Buat `internal/telegram/client.go` — bot client
+- [x] Buat `internal/telegram/formatter.go` — Markdown formatter untuk insight
+- [x] Buat `internal/telegram/whitelist.go` — chat ID validation
+- [x] Implementasi format pesan: title, insight, key_points, follow_ups (Q&A)
+- [x] Unit test dengan mock
 
 **Files:**
 - `internal/telegram/client.go`
@@ -94,11 +94,11 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 3 jam
 
 ### Task 2.4 — Content Package (LLM)
-- [ ] Buat `internal/content/generator.go` — LLM client (OpenRouter)
-- [ ] Buat `internal/content/prompt.go` — prompt templates untuk insight generation
-- [ ] Buat `internal/content/validator.go` — validasi hasil generate
-- [ ] Implementasi JSON parsing dengan fallback
-- [ ] Unit test dengan mock LLM
+- [x] Buat `internal/content/generator.go` — LLM client (OpenRouter)
+- [x] Buat `internal/content/prompt.go` — prompt templates untuk insight generation
+- [x] Buat `internal/content/validator.go` — validasi hasil generate
+- [x] Implementasi JSON parsing dengan fallback
+- [x] Unit test dengan mock LLM
 
 **Files:**
 - `internal/content/generator.go`
@@ -110,11 +110,11 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 3 jam
 
 ### Task 2.5 — Rotation Package
-- [ ] Buat `internal/rotation/engine.go` — main rotation logic
-- [ ] Buat `internal/rotation/selector.go` — weighted round-robin
-- [ ] Buat `internal/rotation/dedup.go` — deduplication logic
-- [ ] Buat `internal/rotation/spaced_repetition.go` — level heuristics
-- [ ] Unit test untuk setiap komponen
+- [x] Buat `internal/rotation/engine.go` — main rotation logic
+- [x] Buat `internal/rotation/selector.go` — weighted round-robin
+- [x] Buat `internal/rotation/dedup.go` — deduplication logic
+- [x] Buat `internal/rotation/spaced_repetition.go` — level heuristics
+- [x] Unit test untuk setiap komponen
 
 **Files:**
 - `internal/rotation/engine.go`
@@ -127,11 +127,11 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 4 jam
 
 ### Task 2.6 — Scheduler Package
-- [ ] Buat `internal/scheduler/scheduler.go` — cron wrapper
-- [ ] Buat `internal/scheduler/job.go` — job definition (send insight)
-- [ ] Buat `internal/scheduler/timezone.go` — WIB timezone handling
-- [ ] Implementasi active hours check
-- [ ] Unit test
+- [x] Buat `internal/scheduler/scheduler.go` — cron wrapper
+- [x] Buat `internal/scheduler/job.go` — job definition (send insight)
+- [x] Buat `internal/scheduler/timezone.go` — WIB timezone handling
+- [x] Implementasi active hours check
+- [x] Unit test
 
 **Files:**
 - `internal/scheduler/scheduler.go`
@@ -143,10 +143,10 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 **Estimasi:** 2 jam
 
 ### Task 2.7 — Retry Package
-- [ ] Buat `internal/retry/retry.go` — retry logic
-- [ ] Buat `internal/retry/backoff.go` — exponential backoff
-- [ ] Buat `internal/retry/policy.go` — retry policy
-- [ ] Unit test
+- [x] Buat `internal/retry/retry.go` — retry logic
+- [x] Buat `internal/retry/backoff.go` — exponential backoff
+- [x] Buat `internal/retry/policy.go` — retry policy
+- [x] Unit test
 
 **Files:**
 - `internal/retry/retry.go`
