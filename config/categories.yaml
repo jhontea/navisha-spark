@@ -1,0 +1,188 @@
+# Topic Taxonomy Configuration
+# Add/remove categories without redeploying
+# Each category has weight for rotation priority (higher = more frequent)
+
+categories:
+  - name: "Golang"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "concurrency"
+      - "goroutine/channel"
+      - "GMP scheduler"
+      - "slice"
+      - "generics"
+      - "profiling"
+      - "interface"
+      - "error handling"
+      - "context package"
+      - "testing"
+
+  - name: "Data Structures & Algorithms"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "array/tree/graph"
+      - "dynamic programming"
+      - "complexity analysis"
+      - "sorting algorithms"
+      - "searching algorithms"
+      - "hash table"
+      - "linked list"
+      - "stack/queue"
+
+  - name: "Coding Challenge"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "worker pool"
+      - "pipeline"
+      - "circuit breaker"
+      - "rate limiter"
+      - "producer-consumer"
+      - "fan-out/fan-in"
+      - "throttling"
+
+  - name: "Database"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "indexing"
+      - "query planning"
+      - "replication"
+      - "transaction isolation"
+      - "ACID properties"
+      - "normalization"
+      - "sharding"
+      - "connection pooling"
+
+  - name: "System Design"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "CAP theorem"
+      - "consistent hashing"
+      - "saga pattern"
+      - "2PC/3PC"
+      - "idempotency"
+      - "rate limiting"
+      - "circuit breaker"
+      - "load balancing"
+
+  - name: "API Design"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "REST vs GraphQL"
+      - "versioning"
+      - "rate limiting"
+      - "gateway/BFF"
+      - "authentication"
+      - "authorization"
+      - "webhook"
+      - "websocket"
+
+  - name: "Deployment / DevOps"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "CI/CD"
+      - "Kubernetes"
+      - "GitOps"
+      - "multi-region"
+      - "disaster recovery"
+      - "blue-green deployment"
+      - "canary release"
+      - "infrastructure as code"
+
+  - name: "Security"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "authn/authz"
+      - "JWT"
+      - "CSRF"
+      - "IDOR"
+      - "OAuth 2.0"
+      - "secrets management"
+      - "encryption"
+      - "OWASP Top 10"
+
+  - name: "Network"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "TCP/IP"
+      - "HTTP internals"
+      - "DNS"
+      - "load balancing"
+      - "TLS handshake"
+      - "HTTP/2"
+      - "gRPC"
+      - "CDN"
+
+  - name: "Caching (Redis)"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "caching strategy"
+      - "distributed lock"
+      - "cluster"
+      - "pub/sub"
+      - "streams"
+      - "cache invalidation"
+      - "cache aside"
+      - "write-through"
+
+  - name: "Message Broker (Kafka)"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "partition"
+      - "consumer group"
+      - "exactly-once"
+      - "KRaft"
+      - "producer/consumer"
+      - "topic/partition"
+      - "offset management"
+      - "stream processing"
+
+  - name: "Distributed Systems"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "consensus"
+      - "replication"
+      - "partition tolerance"
+      - "failure modes"
+      - "leader election"
+      - "vector clock"
+      - "gossip protocol"
+      - "eventual consistency"
+
+  - name: "AI/ML untuk Backend Engineer"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "dasar LLM"
+      - "vector DB"
+      - "RAG"
+      - "ML system design"
+      - "prompt engineering"
+      - "embedding"
+      - "fine-tuning"
+      - "inference optimization"
+
+# Global settings
+settings:
+  # Level distribution: beginner%, intermediate%, advanced%
+  level_distribution:
+    beginner: 20
+    intermediate: 50
+    advanced: 30
+
+  # Minimum days before repeating the same question
+  min_days_before_repeat: 7
+
+  # Deduplication window (hours)
+  dedup_window_hours: 24

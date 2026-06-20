@@ -1,0 +1,87 @@
+# Schedule Configuration
+
+schedule:
+  # Cron expression for triggering content delivery
+  # Default: every 3 hours
+  cron: "0 */3 * * *"
+
+  # Timezone for schedule (WIB = Asia/Jakarta)
+  timezone: "Asia/Jakarta"
+
+  # Active hours (24-hour format)
+  # Messages will only be sent within these hours
+  active_hours:
+    start: 0   # 00:00 WIB
+    end: 23    # 23:00 WIB
+
+# Rotation settings
+rotation:
+  # Level distribution percentage (must sum to 100)
+  level_distribution:
+    beginner: 20
+    intermediate: 50
+    advanced: 30
+
+  # Minimum days before repeating the same question
+  min_days_before_repeat: 7
+
+  # Weighted round-robin settings
+  weighted_round_robin:
+    enabled: true
+    # Higher weight = more priority (longest time since last sent)
+    default_weight: 1.0
+
+# Deduplication settings
+deduplication:
+  # Window in hours to prevent duplicate content
+  window_hours: 24
+
+# Retry settings
+retry:
+  # Maximum number of retry attempts
+  max_retries: 3
+
+  # Delay between retries (exponential backoff)
+  # Format: 1m, 5m, 15m
+  delays:
+    - 1m
+    - 5m
+    - 15m
+
+# Content generation settings
+content:
+  # Primary source: curated questions from database
+  primary_source: "database"
+
+  # Fallback source: LLM generation
+  fallback_source: "llm"
+
+  # LLM settings
+  llm:
+    model: "openrouter/owl-alpha"
+    max_tokens: 1000
+    temperature: 0.7
+
+  # Question format
+  format:
+    include_category: true
+    include_level: true
+    include_follow_ups: true
+    include_tags: true
+    markdown_enabled: true
+
+# Telegram settings
+telegram:
+  # Parse mode: Markdown or HTML
+  parse_mode: "Markdown"
+
+  # Disable web page preview
+  disable_web_page_preview: true
+
+  # Disable notification sound
+  disable_notification: false
+
+# Logging settings
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json or text
