@@ -118,6 +118,32 @@ func (g *Generator) GenerateInsight(ctx context.Context, category, level, subtop
 	return insight, nil
 }
 
+// GenerateInsightWithKey generates a new insight for a specific key/topic.
+// This is used when we want to generate content for a specific subtopic identified by key.
+func (g *Generator) GenerateInsightWithKey(ctx context.Context, category, level, key string) (*GeneratedInsight, error) {
+	prompt := g.promptBuilder.BuildInsightPromptWithKey(category, level, key)
+	systemPrompt := g.promptBuilder.BuildSystemPrompt()
+
+	resp, err := g.callLLM(ctx, systemPrompt, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate insight with key %s: %w", key, err)
+	}
+
+	insight, err := g.parseInsightResponse(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse insight response for key %s: %w", key, err)
+	}
+
+	g.log.WithFields(logrus.Fields{
+		"category": category,
+		"level":    level,
+		"key":      key,
+		"title":    insight.Title,
+	}).Info("insight generated with key successfully")
+
+	return insight, nil
+}
+
 // GenerateVariation generates a variation of an existing insight.
 func (g *Generator) GenerateVariation(ctx context.Context, category, level, existingInsight string) (*GeneratedInsight, error) {
 	prompt := g.promptBuilder.BuildVariationPrompt(category, level, existingInsight)
@@ -132,6 +158,32 @@ func (g *Generator) GenerateVariation(ctx context.Context, category, level, exis
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse variation response: %w", err)
 	}
+
+	return insight, nil
+}
+
+// GenerateVariationForKey generates a variation of an existing insight for a specific key.
+// This ensures the variation stays within the same topic/subtopic.
+func (g *Generator) GenerateVariationForKey(ctx context.Context, category, level, key, existingInsight string) (*GeneratedInsight, error) {
+	prompt := g.promptBuilder.BuildVariationPromptWithKey(category, level, key, existingInsight)
+	systemPrompt := g.promptBuilder.BuildSystemPrompt()
+
+	resp, err := g.callLLM(ctx, systemPrompt, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate variation for key %s: %w", key, err)
+	}
+
+	insight, err := g.parseInsightResponse(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse variation response for key %s: %w", key, err)
+	}
+
+	g.log.WithFields(logrus.Fields{
+		"category": category,
+		"level":    level,
+		"key":      key,
+		"title":    insight.Title,
+	}).Info("variation generated with key successfully")
 
 	return insight, nil
 }

@@ -8,21 +8,31 @@ categories:
     weight: 1.0
     subtopics:
       - "concurrency"
-      - "goroutine/channel"
+      - "goroutine"
+      - "channel"
       - "GMP scheduler"
       - "slice"
       - "generics"
+      - "interface"
       - "profiling"
       - "interface"
       - "error handling"
       - "context package"
       - "testing"
+      - "race condition"
+      - "pointer"
+      - "map"
+      - "dependency injection"
+      - "option pattern"
 
   - name: "Data Structures & Algorithms"
     enabled: true
     weight: 1.0
     subtopics:
       - "array/tree/graph"
+      - "array"
+      - "tree"
+      - "graph"
       - "dynamic programming"
       - "complexity analysis"
       - "sorting algorithms"
@@ -55,6 +65,14 @@ categories:
       - "normalization"
       - "sharding"
       - "connection pooling"
+      - "join"
+      - "common table expression"
+      - "partitioning"
+      - "locking"
+      - "row level security"
+      - "connection"
+      - "write ahead log"
+      - "n+1 query"
 
   - name: "System Design"
     enabled: true
@@ -68,6 +86,15 @@ categories:
       - "rate limiting"
       - "circuit breaker"
       - "load balancing"
+      - "scalability"
+      - "concurrency"
+      - "full text search"
+      - "news feed system"
+      - "payment processing"
+      - "recommendation system"
+      - "search system"
+      - "real time messaging system"
+      - "distributed caching"
 
   - name: "API Design"
     enabled: true
@@ -138,6 +165,7 @@ categories:
     enabled: true
     weight: 1.0
     subtopics:
+      - "broker"
       - "partition"
       - "consumer group"
       - "exactly-once"
@@ -146,6 +174,15 @@ categories:
       - "topic/partition"
       - "offset management"
       - "stream processing"
+      - "retention policy"
+      - "storage"
+      - "replication"
+      - "ordering"
+      - "At-most-once/At-least-once/Exactly-once"
+      - "consumer lag"
+      - "rebalance"
+      - "system design"
+      - "kafka stream vs kafka connect"
 
   - name: "Distributed Systems"
     enabled: true
@@ -159,6 +196,7 @@ categories:
       - "vector clock"
       - "gossip protocol"
       - "eventual consistency"
+      - "caching"
 
   - name: "AI/ML untuk Backend Engineer"
     enabled: true

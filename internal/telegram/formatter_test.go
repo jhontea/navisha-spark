@@ -39,7 +39,17 @@ func TestFormatParagraphs(t *testing.T) {
 		{
 			name:     "markdown special characters",
 			input:    "This is *bold* and _italic_.\n\nThis is a new paragraph with [link](url).",
-			expected: "This is \\*bold\\* and \\_italic\\_.\n\nThis is a new paragraph with \\[link\\]\\(url\\).",
+			expected: "This is \\*bold\\* and \\_italic\\_.\n\nThis is a new paragraph with \\[link\\](url).",
+		},
+		{
+			name:     "hyphens in words should not be escaped",
+			input:    "Fine-tuning is important.\n\nUse 1e-5 learning rate.",
+			expected: "Fine-tuning is important.\n\nUse 1e-5 learning rate.",
+		},
+		{
+			name:     "pre-escaped parentheses should be unescaped",
+			input:    "Use \\(Set If Not eXists\\) command\n\nThis is a new paragraph.",
+			expected: "Use (Set If Not eXists) command\n\nThis is a new paragraph.",
 		},
 	}
 
@@ -78,35 +88,36 @@ func TestFormatWithParagraphs(t *testing.T) {
 	}
 
 	result := formatter.Format(data)
+	resultStr := strings.Join(result, "\n\n")
 
 	// Verify the result contains proper paragraph breaks
-	if !strings.Contains(result, "Goroutines are lightweight threads managed by the Go runtime.\n\nThey are cheaper than OS threads") {
+	if !strings.Contains(resultStr, "Goroutines are lightweight threads managed by the Go runtime.\n\nThey are cheaper than OS threads") {
 		t.Error("Expected proper paragraph breaks in insight text")
 	}
 
 	// Verify markdown is escaped
-	if strings.Contains(result, "*bold*") {
+	if strings.Contains(resultStr, "*bold*") {
 		t.Error("Markdown should be escaped")
 	}
 
 	// Verify structure is maintained
-	if !strings.Contains(result, "📚 *Golang* — *🟡 Intermediate*") {
+	if !strings.Contains(resultStr, "📚 *Golang* — *🟡 Intermediate*") {
 		t.Error("Header should contain category and level")
 	}
 
-	if !strings.Contains(result, "*Understanding Goroutines*") {
+	if !strings.Contains(resultStr, "*Understanding Goroutines*") {
 		t.Error("Title should be present")
 	}
 
-	if !strings.Contains(result, "💡 *Key Points:*") {
+	if !strings.Contains(resultStr, "💡 *Key Points:*") {
 		t.Error("Key points section should be present")
 	}
 
-	if !strings.Contains(result, "🔍 *Deep Dive:*") {
+	if !strings.Contains(resultStr, "🔍 *Deep Dive:*") {
 		t.Error("Deep dive section should be present")
 	}
 
-	if !strings.Contains(result, "---\n_Tags: golang, concurrency, goroutine_") {
+	if !strings.Contains(resultStr, "---\n_Tags: golang, concurrency, goroutine_") {
 		t.Error("Tags section should be present")
 	}
 }
@@ -145,9 +156,10 @@ Untuk kasus sederhana, sequential processing lebih mudah di-maintain. Concurrenc
 	}
 
 	result := formatter.Format(data)
+	resultStr := strings.Join(result, "\n\n")
 
 	// Count the number of double newlines in the insight section
-	insightSection := strings.Split(result, "📝 *Insight:*\n")[1]
+	insightSection := strings.Split(resultStr, "📝 *Insight:*\n")[1]
 	insightSection = strings.Split(insightSection, "\n\n💡")[0]
 
 	paragraphCount := strings.Count(insightSection, "\n\n")

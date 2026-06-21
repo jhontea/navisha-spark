@@ -44,8 +44,9 @@ func NewFormatter(cfg FormatConfig) *Formatter {
 	return &Formatter{config: cfg}
 }
 
-// Format formats an insight into a Telegram message string.
-func (f *Formatter) Format(data *InsightData) string {
+// Format formats an insight into one or more Telegram messages.
+// If the message exceeds Telegram's 4096 character limit, it will be split into multiple messages.
+func (f *Formatter) Format(data *InsightData) []string {
 	var b strings.Builder
 
 	// Header with category and level
@@ -53,7 +54,7 @@ func (f *Formatter) Format(data *InsightData) string {
 		b.WriteString("📚 ")
 		if f.config.IncludeCategory {
 			b.WriteString("*")
-			b.WriteString(escapeMarkdown(data.Category))
+			b.WriteString(safeEscapeMarkdown(data.Category))
 			b.WriteString("*")
 		}
 		if f.config.IncludeLevel {
@@ -69,7 +70,7 @@ func (f *Formatter) Format(data *InsightData) string {
 
 	// Title
 	b.WriteString("*")
-	b.WriteString(escapeMarkdown(data.Title))
+	b.WriteString(safeEscapeMarkdown(data.Title))
 	b.WriteString("*")
 	b.WriteString("\n\n")
 
@@ -83,7 +84,7 @@ func (f *Formatter) Format(data *InsightData) string {
 		b.WriteString("💡 *Key Points:*\n")
 		for _, point := range data.KeyPoints {
 			b.WriteString("• ")
-			b.WriteString(escapeMarkdown(point))
+			b.WriteString(safeEscapeMarkdown(point))
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
@@ -105,10 +106,10 @@ func (f *Formatter) Format(data *InsightData) string {
 				b.WriteString("\n")
 			}
 			b.WriteString("*Q: ")
-			b.WriteString(escapeMarkdown(fu.Question))
+			b.WriteString(safeEscapeMarkdown(fu.Question))
 			b.WriteString("*\n")
 			b.WriteString("A: ")
-			b.WriteString(escapeMarkdown(fu.Answer))
+			b.WriteString(safeEscapeMarkdown(fu.Answer))
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
@@ -122,7 +123,15 @@ func (f *Formatter) Format(data *InsightData) string {
 		b.WriteString("_\n")
 	}
 
-	return b.String()
+	message := b.String()
+
+	// Split if exceeds Telegram's 4096 character limit
+	const maxLength = 4096
+	if len(message) > maxLength {
+		return f.splitMessage(message, maxLength)
+	}
+
+	return []string{message}
 }
 
 // FormatSimple formats a simple text message without structured formatting.
@@ -153,12 +162,14 @@ func formatLevel(level string) string {
 
 // formatParagraphs formats text with proper paragraph breaks for better readability.
 // It ensures paragraphs are separated by single newlines and removes excessive whitespace.
+// This function handles markdown escaping internally to prevent double-escaping.
 func formatParagraphs(text string) string {
-	// First escape markdown
-	escaped := escapeMarkdown(text)
+	// Unescape any pre-escaped markdown to avoid double-escaping
+	// This handles cases where LLM already escaped characters like \( or \*
+	unescaped := unescapeMarkdown(text)
 
 	// Split by double newlines to identify paragraphs
-	paragraphs := strings.Split(escaped, "\n\n")
+	paragraphs := strings.Split(unescaped, "\n\n")
 
 	// Clean up each paragraph and join with single newlines
 	var cleaned []string
@@ -173,32 +184,163 @@ func formatParagraphs(text string) string {
 	}
 
 	// Join paragraphs with double newline for visual separation
-	return strings.Join(cleaned, "\n\n")
+	joined := strings.Join(cleaned, "\n\n")
+
+	// Re-escape markdown for Telegram
+	return escapeMarkdown(joined)
+}
+
+// unescapeMarkdown reverses markdown escaping to prevent double-escaping.
+func unescapeMarkdown(text string) string {
+	replacer := strings.NewReplacer(
+		"\\_", "_",
+		"\\*", "*",
+		"\\[", "[",
+		"\\]", "]",
+		"\\(", "(",
+		"\\)", ")",
+		"\\~", "~",
+		"\\`", "`",
+		"\\>", ">",
+		"\\#", "#",
+		"\\+", "+",
+		"\\-", "-",
+		"\\=", "=",
+		"\\|", "|",
+		"\\{", "{",
+		"\\}", "}",
+		"\\!", "!",
+	)
+	return replacer.Replace(text)
+}
+
+// splitMessage splits a long message into multiple parts that fit within Telegram's character limit.
+// It tries to split at paragraph boundaries to avoid cutting off mid-sentence.
+// When splitting, Markdown formatting is stripped from all parts except the first one to avoid parsing errors.
+func (f *Formatter) splitMessage(message string, maxLength int) []string {
+	if len(message) <= maxLength {
+		return []string{message}
+	}
+
+	var messages []string
+	remaining := message
+
+	for len(remaining) > maxLength {
+		// Try to find a good split point (double newline = paragraph break)
+		splitAt := strings.LastIndex(remaining[:maxLength], "\n\n")
+		if splitAt <= 0 {
+			// Fallback: try single newline
+			splitAt = strings.LastIndex(remaining[:maxLength], "\n")
+		}
+		if splitAt <= 0 {
+			// Last resort: hard split at maxLength
+			splitAt = maxLength
+		}
+
+		// Add the part
+		part := strings.TrimSpace(remaining[:splitAt])
+		if part != "" {
+			messages = append(messages, part)
+		}
+
+		// Move to next part
+		remaining = strings.TrimSpace(remaining[splitAt:])
+	}
+
+	// Add the remaining part
+	if remaining != "" {
+		messages = append(messages, remaining)
+	}
+
+	// Add part indicators (1/2, 2/2, etc.)
+	// Strip markdown from all parts to avoid parsing errors when split
+	totalParts := len(messages)
+	for i := range messages {
+		// Strip markdown formatting for split messages to avoid entity parsing errors
+		plainText := f.stripMarkdown(messages[i])
+		messages[i] = fmt.Sprintf("(%d/%d) %s", i+1, totalParts, plainText)
+	}
+
+	return messages
+}
+
+// stripMarkdown removes markdown formatting characters to create plain text.
+// This is used for split messages where markdown entities might be broken.
+func (f *Formatter) stripMarkdown(text string) string {
+	// Remove markdown bold/italic markers
+	replacer := strings.NewReplacer(
+		"*", "",
+		"_", "",
+		"`", "",
+		"~", "",
+	)
+	return replacer.Replace(text)
+}
+
+// safeEscapeMarkdown safely escapes markdown by first unescaping any pre-escaped content,
+// then escaping it properly. This prevents double-escaping issues from LLM output.
+func safeEscapeMarkdown(text string) string {
+	// First unescape any pre-escaped markdown from LLM
+	unescaped := unescapeMarkdown(text)
+	// Then escape properly for Telegram
+	return escapeMarkdown(unescaped)
 }
 
 // escapeMarkdown escapes Telegram Markdown special characters.
+// Note: Parentheses () do NOT need escaping in Telegram Markdown.
+// Hyphens (-) are only escaped when at the start of a line to prevent list interpretation.
 func escapeMarkdown(text string) string {
-	// Characters to escape in Markdown: _ * [ ] ( ) ~ ` > # + - = | { } !
-	replacer := strings.NewReplacer(
-		"_", "\\_",
-		"*", "\\*",
-		"[", "\\[",
-		"]", "\\]",
-		"(", "\\(",
-		")", "\\)",
-		"~", "\\~",
-		"`", "\\`",
-		">", "\\>",
-		"#", "\\#",
-		"+", "\\+",
-		"-", "\\-",
-		"=", "\\=",
-		"|", "\\|",
-		"{", "\\{",
-		"}", "\\}",
-		"!", "\\!",
-	)
-	return replacer.Replace(text)
+	var b strings.Builder
+
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+
+		// Escape hyphen only if at start of line (after newline or at beginning)
+		if ch == '-' {
+			if i == 0 || text[i-1] == '\n' {
+				b.WriteString("\\-")
+				continue
+			}
+			b.WriteByte(ch)
+			continue
+		}
+
+		// Escape other markdown characters
+		switch ch {
+		case '_':
+			b.WriteString("\\_")
+		case '*':
+			b.WriteString("\\*")
+		case '[':
+			b.WriteString("\\[")
+		case ']':
+			b.WriteString("\\]")
+		case '~':
+			b.WriteString("\\~")
+		case '`':
+			b.WriteString("\\`")
+		case '>':
+			b.WriteString("\\>")
+		case '#':
+			b.WriteString("\\#")
+		case '+':
+			b.WriteString("\\+")
+		case '=':
+			b.WriteString("\\=")
+		case '|':
+			b.WriteString("\\|")
+		case '{':
+			b.WriteString("\\{")
+		case '}':
+			b.WriteString("\\}")
+		case '!':
+			b.WriteString("\\!")
+		default:
+			b.WriteByte(ch)
+		}
+	}
+
+	return b.String()
 }
 
 // FormatInsightFromDB formats a database insight into a formatted message.
@@ -220,7 +362,8 @@ func (f *Formatter) FormatInsightFromDB(insight *InsightFromDB) string {
 	// For now, use the FollowUps field if already parsed
 	data.FollowUps = insight.FollowUpsList
 
-	return f.Format(data)
+	messages := f.Format(data)
+	return strings.Join(messages, "\n\n")
 }
 
 // InsightFromDB is a helper struct for formatting insights from the database.

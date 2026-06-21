@@ -96,6 +96,71 @@ Respond ONLY with valid JSON in this exact format:
 	return b.String()
 }
 
+// BuildInsightPromptWithKey builds a prompt for generating a new insight for a specific key/topic.
+func (pb *PromptBuilder) BuildInsightPromptWithKey(category, level, key string) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf(`Buatkan insight pembelajaran level %s tentang topik %s dengan fokus pada: %s dalam bahasa Indonesia.
+
+Requirements:
+1. Title: Jelas dan spesifik (maks 100 karakter)
+2. Insight: Penjelasan komprehensif (300-500 kata) dengan:
+   - Definisi dan konsep inti
+   - Contoh praktis dan use case
+   - Code snippets jika applicable
+   - Kapan menggunakan dan kapan tidak menggunakan
+   - Common pitfalls dan best practices
+3. Key Points: 3-5 bullet points yang merangkum insight
+4. Follow-ups: 2-3 pertanyaan dengan jawaban detail (masing-masing 100-200 kata)
+5. Tags: 3-5 tag yang relevan
+
+Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
+{
+    "title": "...",
+    "insight": "...",
+    "key_points": ["..."],
+    "code_example": "...",
+    "follow_ups": [
+        {"q": "...", "a": "..."}
+    ],
+    "tags": ["..."]
+}`, level, category, key))
+
+	return b.String()
+}
+
+// BuildVariationPromptWithKey builds a prompt for creating a variation of an existing insight for a specific key.
+func (pb *PromptBuilder) BuildVariationPromptWithKey(category, level, key, existingInsight string) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf(`Buatkan variasi dari insight %s level tentang %s dengan topik %s berikut dalam bahasa Indonesia.
+Variasi ini harus mencakup aspek atau sudut pandang yang berbeda tetapi terkait dengan topik yang sama.
+
+Insight asli:
+%s
+
+Requirements:
+1. Title: Berbeda dari asli (maks 100 karakter)
+2. Insight: Penjelasan komprehensif (300-500 kata) yang mencakup aspek berbeda
+3. Key Points: 3-5 bullet points
+4. Follow-ups: 2-3 pertanyaan dengan jawaban
+5. Tags: 3-5 tag yang relevan
+
+Respond ONLY with valid JSON in this exact format:
+{
+    "title": "...",
+    "insight": "...",
+    "key_points": ["..."],
+    "code_example": "...",
+    "follow_ups": [
+        {"q": "...", "a": "..."}
+    ],
+    "tags": ["..."]
+}`, level, category, key, existingInsight))
+
+	return b.String()
+}
+
 // BuildFollowUpPrompt builds a prompt for generating follow-up questions.
 func (pb *PromptBuilder) BuildFollowUpPrompt(category, level, title, insight string) string {
 	var b strings.Builder
@@ -133,9 +198,14 @@ Guidelines:
 4. Focus on concepts that matter for senior-level understanding
 5. Use clear, professional Indonesian language
 6. Include code examples in Go when relevant
-7. Always provide code examples in proper syntax without markdown formatting
+7. Provide code examples in proper syntax (no markdown code blocks in the JSON values)
 
-CRITICAL: Your response must be ONLY valid JSON. No markdown formatting, no code blocks, no explanation.`
+CRITICAL INSTRUCTIONS:
+- Your response must be ONLY valid JSON
+- Do NOT escape markdown characters (like *, _, [, ], etc.) in the JSON string values
+- Write plain text in the JSON values - the system will handle markdown formatting later
+- No markdown formatting, no code blocks, no explanation outside the JSON structure
+- Example: Write "SET key value" NOT "\SET\ key\ value" in the JSON strings`
 }
 
 // GeneratePrompt generates a complete prompt with system message and user message.

@@ -142,6 +142,7 @@ func main() {
 		telegramClient,
 		telegramFmt,
 		categories,
+		cfg.Categories,
 		logger,
 	)
 
@@ -173,7 +174,38 @@ func main() {
 	// Setup config watcher for hot-reload
 	if err := config.WatchConfig("config/config.yaml", func(newCfg *config.Config) {
 		logger.Info("configuration reloaded")
-		// TODO: Update running services with new config if needed
+
+		// Update scheduler with new cron expression if it changed
+		oldCron := cfg.Schedule.Cron
+		newCron := newCfg.Schedule.Cron
+
+		if oldCron != newCron {
+			logger.WithFields(logrus.Fields{
+				"old_cron": oldCron,
+				"new_cron": newCron,
+			}).Info("updating scheduler cron expression")
+
+			// Remove old job and add with new cron
+			if err := sched.RemoveJob("send_insight"); err != nil {
+				logger.WithError(err).Error("failed to remove old job")
+				return
+			}
+
+			if err := sched.AddJob("send_insight", newCron, func() {
+				err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute)
+				if err != nil {
+					logger.WithError(err).Error("insight delivery job failed")
+				}
+			}); err != nil {
+				logger.WithError(err).Error("failed to add job with new cron")
+				return
+			}
+
+			logger.Info("scheduler cron expression updated successfully")
+		}
+
+		// Update the global config reference
+		cfg = newCfg
 	}); err != nil {
 		logger.WithError(err).Warn("failed to setup config watcher")
 	}

@@ -17,6 +17,7 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang secara otomati
 | 🚫 **Deduplication** | Tidak ada konten yang sama dalam 24 jam |
 | 🔁 **Auto Retry** | Exponential backoff (1m, 5m, 15m) jika gagal |
 | 🤖 **LLM Integration** | Generate insight on-the-fly via OpenRouter (free model) |
+| 🔑 **Key-Based Topics** | Setiap insight memiliki key unik untuk prompt variation yang lebih baik |
 | 🔧 **Hot-Reload Config** | Edit kategori/jadwal tanpa restart |
 | 🐳 **Docker Ready** | Multi-stage build, health check, auto-restart |
 | 🔒 **Chat ID Whitelist** | Hanya user tertentu yang bisa menerima pesan |
@@ -216,6 +217,76 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o spark ./cmd/spark
 | Supabase (Free) | $0 | 500MB database |
 | OpenRouter (Free) | $0-5 | Free model tersedia |
 | **Total** | **$5-10** | Dalam target budget |
+
+---
+
+## 🔑 Key Column Feature
+
+### Apa itu Key?
+
+Key adalah identifier unik untuk setiap topik/subtopic dalam suatu kategori. Key digunakan untuk:
+
+1. **Prompt Variation yang Lebih Baik**: LLM mendapatkan konteks yang lebih spesifik tentang topik yang ingin dibahas
+2. **Deduplication yang Lebih Akurat**: Memastikan tidak ada insight dengan topik yang sama dalam jendela waktu tertentu
+3. **Organisasi Konten yang Lebih Baik**: Memudahkan dalam mengelola dan mencari insight berdasarkan topik
+
+### Format Key
+
+Key menggunakan format `kebab-case` yang deskriptif, contoh:
+- `goroutine-basics`
+- `transaction-isolation`
+- `cap-theorem`
+- `redis-caching-strategies`
+- `api-rate-limiting`
+
+### Contoh Penggunaan
+
+**Sebelum (tanpa key):**
+```sql
+INSERT INTO insights (category, level, title, insight, key_points, ...)
+VALUES (
+    'Golang',
+    'beginner',
+    'Understanding Goroutine',
+    'Goroutine adalah thread ringan...',
+    ARRAY['...'],
+    ...
+);
+```
+
+**Sesudah (dengan key):**
+```sql
+INSERT INTO insights (category, level, title, insight, key, key_points, ...)
+VALUES (
+    'Golang',
+    'beginner',
+    'Understanding Goroutine',
+    'Goroutine adalah thread ringan...',
+    'goroutine-basics',  -- Key baru
+    ARRAY['...'],
+    ...
+);
+```
+
+### Manfaat untuk LLM Generation
+
+Saat generate insight baru, sistem akan menggunakan key sebagai fokus prompt:
+
+```
+Buatkan insight pembelajaran level beginner tentang topik Golang dengan fokus pada: goroutine-basics dalam bahasa Indonesia.
+```
+
+Ini menghasilkan konten yang lebih terarah dan konsisten dibandingkan hanya menggunakan kategori umum.
+
+### Unique Constraint
+
+Database memiliki unique constraint pada `(category, key)` untuk memastikan tidak ada duplikasi topik dalam satu kategori:
+
+```sql
+CREATE UNIQUE INDEX idx_insights_category_key 
+ON insights(category, key) 
+WHERE key IS NOT NULL;
+```
 
 ---
 

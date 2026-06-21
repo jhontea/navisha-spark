@@ -35,6 +35,7 @@ type SelectionResult struct {
 	Insight  *repository.Insight
 	Category string
 	Level    string
+	Key      string
 	FromBank bool
 }
 
@@ -111,19 +112,56 @@ func (e *Engine) SelectNext(ctx context.Context, categories []string) (*Selectio
 
 		if len(insight) > 0 {
 			// Found an insight in the bank
+			selectedInsight := insight[0]
+
 			e.log.WithFields(logrus.Fields{
 				"category":   cp.category,
 				"level":      level,
-				"insight_id": insight[0].ID,
+				"insight_id": selectedInsight.ID,
+				"key":        selectedInsight.Key,
 				"source":     "bank",
 			}).Info("selected insight from bank")
 
+			key := ""
+			if selectedInsight.Key != nil {
+				key = *selectedInsight.Key
+			}
+
 			return &SelectionResult{
-				Insight:  &insight[0],
+				Insight:  &selectedInsight,
 				Category: cp.category,
 				Level:    level,
+				Key:      key,
 				FromBank: true,
 			}, nil
+		}
+
+		// No unsent insight found, check if we should generate a variation
+		// Pick a random key from subtopics for this category
+		key := e.pickRandomKey(cp.category)
+		if key != "" {
+			// Check if there are existing insights with this key
+			existingInsights, err := e.insightRepo.GetByCategoryAndKey(ctx, cp.category, key)
+			if err == nil && len(existingInsights) > 0 {
+				// Found existing insights with this key, select the oldest one for variation
+				baseInsight := existingInsights[0]
+
+				e.log.WithFields(logrus.Fields{
+					"category": cp.category,
+					"level":    level,
+					"key":      key,
+					"base_id":  baseInsight.ID,
+					"source":   "variation",
+				}).Info("will generate variation for existing key")
+
+				return &SelectionResult{
+					Insight:  &baseInsight,
+					Category: cp.category,
+					Level:    level,
+					Key:      key,
+					FromBank: false, // Mark as variation needed
+				}, nil
+			}
 		}
 
 		// No insight found in bank for this category, try next category
@@ -136,6 +174,15 @@ func (e *Engine) SelectNext(ctx context.Context, categories []string) (*Selectio
 	// If no insights found in any category, return nil to trigger LLM generation
 	e.log.Warn("no insights found in bank for any category, will need LLM generation")
 	return nil, nil
+}
+
+// pickRandomKey picks a random subtopic key for a given category.
+// This is used when we need to generate a variation or new insight.
+func (e *Engine) pickRandomKey(category string) string {
+	// This is a simplified version - in production, this would use the category config
+	// For now, we'll return a generic key based on the category
+	// The actual subtopic selection is done in the scheduler job
+	return ""
 }
 
 // calculatePriority calculates the priority score for a category.
@@ -191,8 +238,69 @@ func (e *Engine) RecordDelivery(ctx context.Context, category, level string, ins
 func (e *Engine) GetCategoryPriority(ctx context.Context, category string) (float64, error) {
 	state, err := e.rotationRepo.GetByCategory(ctx, category)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get rotation state: %w", err)
+		return 0, fmt.Errorf("failed to get rotation state for %s: %w", category, err)
 	}
 
 	return e.calculatePriority(category, state), nil
+}
+
+// GetAllRotationStates returns all rotation states.
+func (e *Engine) GetAllRotationStates(ctx context.Context) ([]repository.RotationState, error) {
+	return e.rotationRepo.GetAll(ctx)
+}
+
+// SelectCategoryForLLM selects the highest priority category for LLM generation.
+// This is used when the insight bank has no available content.
+func (e *Engine) SelectCategoryForLLM(ctx context.Context, categories []string) (string, error) {
+	if len(categories) == 0 {
+		return "", fmt.Errorf("no categories available")
+	}
+
+	if len(categories) == 1 {
+		return categories[0], nil
+	}
+
+	// Get all rotation states
+	states, err := e.rotationRepo.GetAll(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get rotation states: %w", err)
+	}
+
+	// Build state map
+	stateMap := make(map[string]*repository.RotationState)
+	for i := range states {
+		stateMap[states[i].Category] = &states[i]
+	}
+
+	// Calculate priorities for each category
+	type categoryPriority struct {
+		category string
+		priority float64
+	}
+
+	var priorities []categoryPriority
+	for _, cat := range categories {
+		state := stateMap[cat]
+		priority := e.calculatePriority(cat, state)
+		priorities = append(priorities, categoryPriority{
+			category: cat,
+			priority: priority,
+		})
+	}
+
+	// Sort by priority (highest first)
+	sort.Slice(priorities, func(i, j int) bool {
+		return priorities[i].priority > priorities[j].priority
+	})
+
+	// Use the selector's weighted random for tie-breaking among top categories
+	if len(priorities) > 1 && priorities[0].priority == priorities[1].priority {
+		// Top two have same priority, pick randomly between them
+		if e.selector.rng.Float64() < 0.5 {
+			return priorities[0].category, nil
+		}
+		return priorities[1].category, nil
+	}
+
+	return priorities[0].category, nil
 }

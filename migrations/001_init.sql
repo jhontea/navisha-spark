@@ -131,36 +131,39 @@ $$ LANGUAGE plpgsql;
 -- Uncomment below to insert sample insights
 -- Note: Use $$ quoting for text containing single quotes
 
--- INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
+-- INSERT INTO insights (category, level, title, insight, key, key_points, code_example, follow_ups, tags)
 -- VALUES (
 --     'Golang',
 --     'beginner',
 --     'Understanding Goroutine',
 --     $$Goroutine adalah thread ringan yang dikelola oleh Go runtime. Goroutine memungkinkan eksekusi concurrent dengan biaya memory yang sangat kecil (mulai dari 2KB) dibandingkan thread OS (1MB).$$,
+--     'goroutine-basics',
 --     ARRAY['Goroutine lebih ringan dari thread OS', 'Dikelola oleh Go runtime', 'Mudah dibuat dengan keyword go'],
 --     'go func() { fmt.Println("Hello") }()',
 --     '[{"q":"Bagaimana cara membuat goroutine?", "a":"Gunakan keyword go sebelum fungsi: go myFunction()"}, {"q":"Apa perbedaan goroutine dan thread?", "a":"Goroutine lebih ringan, dikelola runtime, multiplexed ke thread OS"}]'::jsonb,
 --     ARRAY['golang', 'concurrency', 'goroutine']
 -- );
 
--- INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
+-- INSERT INTO insights (category, level, title, insight, key, key_points, code_example, follow_ups, tags)
 -- VALUES (
 --     'Database',
 --     'intermediate',
 --     'Transaction Isolation Levels',
 --     $$Transaction isolation level menentukan seberapa satu transaksi terisolasi dari transaksi lain. PostgreSQL menyediakan 4 level: Read Uncommitted, Read Committed, Repeatable Read, dan Serializable.$$,
+--     'transaction-isolation',
 --     ARRAY['Read Committed adalah default di PostgreSQL', 'Serializable memberikan isolation tertinggi', 'Semakin tinggi isolation, semakin besar overhead'],
 --     'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;',
 --     '[{"q":"Apa perbedaan Read Committed dan Repeatable Read?", "a":"Read Committed hanya melindungi dari dirty read, Repeatable Read melindungi dari non-repeatable read"}, {"q":"Apa itu dirty read?", "a":"Membaca data yang belum di-commit dari transaksi lain"}]'::jsonb,
 --     ARRAY['database', 'postgresql', 'transaction', 'isolation']
 -- );
 
--- INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
+-- INSERT INTO insights (category, level, title, insight, key, key_points, code_example, follow_ups, tags)
 -- VALUES (
 --     'System Design',
 --     'advanced',
 --     'CAP Theorem Deep Dive',
 --     $$CAP Theorem menyatakan bahwa distributed system hanya bisa memenuhi 2 dari 3 properti: Consistency (semua node melihat data yang sama), Availability (setiap request mendapatkan response), Partition Tolerance (system tetap berjalan meskipun ada network partition).$$,
+--     'cap-theorem',
 --     ARRAY['Partition Tolerance adalah mandatory dalam distributed system', 'CP vs AP trade-off tergantung use case', 'Tidak ada sistem yang pure CAP di real world'],
 --     '// CP System: etcd, ZooKeeper\n// AP System: Cassandra, DynamoDB',
 --     '[{"q":"Bagaimana cara trade-off CAP?", "a":"Pilih CP jika konsistensi critical (financial), AP jika availability critical (social media)"}, {"q":"Apa yang dimaksud dengan eventual consistency?", "a":"Sistem yang akhirnya konsisten setelah partition healed, tapi tidak ada jaminan waktu"}]'::jsonb,

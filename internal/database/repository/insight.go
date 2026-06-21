@@ -18,6 +18,7 @@ type Insight struct {
 	Level       string          `db:"level" json:"level"`
 	Title       string          `db:"title" json:"title"`
 	Insight     string          `db:"insight" json:"insight"`
+	Key         *string         `db:"key" json:"key,omitempty"`
 	KeyPoints   pq.StringArray  `db:"key_points" json:"key_points"`
 	CodeExample *string         `db:"code_example" json:"code_example,omitempty"`
 	FollowUps   json.RawMessage `db:"follow_ups" json:"follow_ups"`
@@ -41,8 +42,8 @@ func NewInsightRepository(db *sqlx.DB) *InsightRepository {
 // Create inserts a new insight into the database.
 func (r *InsightRepository) Create(ctx context.Context, insight *Insight) error {
 	query := `
-		INSERT INTO insights (category, level, title, insight, key_points, code_example, follow_ups, tags)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO insights (category, level, title, insight, key, key_points, code_example, follow_ups, tags)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at`
 
 	err := r.db.QueryRowContext(ctx, query,
@@ -50,6 +51,7 @@ func (r *InsightRepository) Create(ctx context.Context, insight *Insight) error 
 		insight.Level,
 		insight.Title,
 		insight.Insight,
+		insight.Key,
 		insight.KeyPoints,
 		insight.CodeExample,
 		insight.FollowUps,
@@ -66,7 +68,7 @@ func (r *InsightRepository) Create(ctx context.Context, insight *Insight) error 
 // GetByID retrieves an insight by its ID.
 func (r *InsightRepository) GetByID(ctx context.Context, id int) (*Insight, error) {
 	query := `
-		SELECT id, category, level, title, insight, key_points, code_example, follow_ups, tags,
+		SELECT id, category, level, title, insight, key, key_points, code_example, follow_ups, tags,
 		       times_sent, last_sent_at, created_at, updated_at
 		FROM insights WHERE id = $1`
 
@@ -85,7 +87,7 @@ func (r *InsightRepository) GetByID(ctx context.Context, id int) (*Insight, erro
 // GetByCategoryAndLevel retrieves insights filtered by category and level.
 func (r *InsightRepository) GetByCategoryAndLevel(ctx context.Context, category, level string) ([]Insight, error) {
 	query := `
-		SELECT id, category, level, title, insight, key_points, code_example, follow_ups, tags,
+		SELECT id, category, level, title, insight, key, key_points, code_example, follow_ups, tags,
 		       times_sent, last_sent_at, created_at, updated_at
 		FROM insights
 		WHERE category = $1 AND level = $2
@@ -103,7 +105,7 @@ func (r *InsightRepository) GetByCategoryAndLevel(ctx context.Context, category,
 // GetUnsentInWindow retrieves insights that haven't been sent within the dedup window.
 func (r *InsightRepository) GetUnsentInWindow(ctx context.Context, category, level string, windowHours int) ([]Insight, error) {
 	query := `
-		SELECT i.id, i.category, i.level, i.title, i.insight, i.key_points, i.code_example,
+		SELECT i.id, i.category, i.level, i.title, i.insight, i.key, i.key_points, i.code_example,
 		       i.follow_ups, i.tags, i.times_sent, i.last_sent_at, i.created_at, i.updated_at
 		FROM insights i
 		WHERE i.category = $1 AND i.level = $2
@@ -126,7 +128,7 @@ func (r *InsightRepository) GetUnsentInWindow(ctx context.Context, category, lev
 // GetRandomByCategoryAndLevel retrieves a random insight for a given category and level.
 func (r *InsightRepository) GetRandomByCategoryAndLevel(ctx context.Context, category, level string) (*Insight, error) {
 	query := `
-		SELECT id, category, level, title, insight, key_points, code_example, follow_ups, tags,
+		SELECT id, category, level, title, insight, key, key_points, code_example, follow_ups, tags,
 		       times_sent, last_sent_at, created_at, updated_at
 		FROM insights
 		WHERE category = $1 AND level = $2
@@ -195,7 +197,7 @@ func (r *InsightRepository) CountByCategory(ctx context.Context) (map[string]int
 // SearchByTags searches insights by tags.
 func (r *InsightRepository) SearchByTags(ctx context.Context, tags []string) ([]Insight, error) {
 	query := `
-		SELECT id, category, level, title, insight, key_points, code_example, follow_ups, tags,
+		SELECT id, category, level, title, insight, key, key_points, code_example, follow_ups, tags,
 		       times_sent, last_sent_at, created_at, updated_at
 		FROM insights
 		WHERE tags && $1
@@ -229,4 +231,24 @@ func (r *InsightRepository) Delete(ctx context.Context, id int) error {
 	}
 
 	return nil
+}
+
+// GetByCategoryAndKey retrieves insights by category and key, ordered by last_sent_at.
+// This is used for variation generation when we want to create a variation of an existing insight.
+func (r *InsightRepository) GetByCategoryAndKey(ctx context.Context, category, key string) ([]Insight, error) {
+	query := `
+		SELECT id, category, level, title, insight, key, key_points, code_example, follow_ups, tags,
+		       times_sent, last_sent_at, created_at, updated_at
+		FROM insights
+		WHERE category = $1 AND key = $2
+		ORDER BY last_sent_at ASC NULLS FIRST
+		LIMIT 5`
+
+	var insights []Insight
+	err := r.db.SelectContext(ctx, &insights, query, category, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get insights by category %s and key %s: %w", category, key, err)
+	}
+
+	return insights, nil
 }

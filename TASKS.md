@@ -191,23 +191,23 @@ Daftar task untuk implementasi Navisha Spark. Dibagi menjadi beberapa fase berda
 ## Fase 4: Integration & Testing
 
 ### Task 4.1 — Integration Test
-- [ ] Test end-to-end: scheduler trigger → rotation → content → telegram
-- [ ] Test retry logic dengan simulated failure
-- [ ] Test deduplication (kirim insight yang sama dalam 24 jam)
-- [ ] Test hot-reload config
-- [ ] Test graceful shutdown
+- [x] Test end-to-end: scheduler trigger → rotation → content → telegram
+- [x] Test retry logic dengan simulated failure
+- [x] Test deduplication (kirim insight yang sama dalam 24 jam)
+- [x] Test hot-reload config
+- [x] Test graceful shutdown
 
 **Files:** `*_test.go` di setiap package  
 **Dependencies:** Semua Fase 3  
 **Estimasi:** 3 jam
 
 ### Task 4.2 — Manual Testing via Telegram
-- [ ] Start aplikasi
-- [ ] Tunggu jadwal pertama (atau trigger manual)
-- [ ] Verifikasi format pesan di Telegram
-- [ ] Verifikasi follow-up questions muncul dengan jawaban
-- [ ] Verifikasi key points terformat dengan baik
-- [ ] Verifikasi tidak ada duplicate content
+- [x] Start aplikasi
+- [x] Tunggu jadwal pertama (atau trigger manual)
+- [x] Verifikasi format pesan di Telegram
+- [x] Verifikasi follow-up questions muncul dengan jawaban
+- [x] Verifikasi key points terformat dengan baik
+- [x] Verifikasi tidak ada duplicate content
 
 **Dependencies:** Task 4.1  
 **Estimasi:** 2 jam (menunggu jadwal)

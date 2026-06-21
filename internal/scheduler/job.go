@@ -3,10 +3,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/navisha/spark/internal/config"
 	"github.com/navisha/spark/internal/content"
 	"github.com/navisha/spark/internal/database/repository"
 	"github.com/navisha/spark/internal/rotation"
@@ -22,7 +24,9 @@ type SendInsightJob struct {
 	telegramClient   *telegram.Client
 	telegramFmt      *telegram.Formatter
 	categories       []string
+	categoryConfigs  []config.Category
 	log              *logrus.Entry
+	rng              *rand.Rand
 }
 
 // NewSendInsightJob creates a new SendInsightJob.
@@ -34,6 +38,7 @@ func NewSendInsightJob(
 	telegramClient *telegram.Client,
 	telegramFmt *telegram.Formatter,
 	categories []string,
+	categoryConfigs []config.Category,
 	log *logrus.Entry,
 ) *SendInsightJob {
 	return &SendInsightJob{
@@ -44,7 +49,9 @@ func NewSendInsightJob(
 		telegramClient:   telegramClient,
 		telegramFmt:      telegramFmt,
 		categories:       categories,
+		categoryConfigs:  categoryConfigs,
 		log:              log,
+		rng:              rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -61,30 +68,136 @@ func (j *SendInsightJob) Execute(ctx context.Context) error {
 	var insight *repository.Insight
 	var category, level string
 
-	if selection != nil && selection.FromBank {
-		// Use insight from bank
-		insight = selection.Insight
+	if selection != nil {
 		category = selection.Category
 		level = selection.Level
-		j.log.WithFields(logrus.Fields{
-			"insight_id": insight.ID,
-			"category":   category,
-			"level":      level,
-		}).Info("using insight from bank")
-	} else {
-		// Generate new insight via LLM
-		j.log.Info("no insight in bank, generating via LLM")
 
-		// Use first available category
+		if selection.FromBank {
+			// Use insight directly from bank
+			insight = selection.Insight
+			j.log.WithFields(logrus.Fields{
+				"insight_id": insight.ID,
+				"category":   category,
+				"level":      level,
+			}).Info("using insight from bank")
+		} else if selection.Insight != nil && selection.Key != "" {
+			// Generate variation of existing insight with the same key
+			j.log.WithFields(logrus.Fields{
+				"base_id":  selection.Insight.ID,
+				"category": category,
+				"level":    level,
+				"key":      selection.Key,
+			}).Info("generating variation of existing insight")
+
+			generated, err := j.contentGen.GenerateVariationForKey(
+				ctx,
+				category,
+				level,
+				selection.Key,
+				selection.Insight.Insight,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to generate variation for key %s: %w", selection.Key, err)
+			}
+
+			// Validate generated content
+			validationResult := j.contentValidator.Validate(generated)
+			if !validationResult.Valid {
+				j.log.WithFields(logrus.Fields{
+					"errors":   validationResult.Errors,
+					"warnings": validationResult.Warnings,
+				}).Warn("generated variation has validation issues")
+			}
+
+			// Save variation to database
+			insight = &repository.Insight{
+				Category:  category,
+				Level:     level,
+				Title:     generated.Title,
+				Insight:   generated.Insight,
+				Key:       &selection.Key,
+				KeyPoints: generated.KeyPoints,
+				Tags:      generated.Tags,
+			}
+
+			if generated.CodeExample != "" {
+				insight.CodeExample = &generated.CodeExample
+			}
+
+			if err := j.insightRepo.Create(ctx, insight); err != nil {
+				return fmt.Errorf("failed to save variation: %w", err)
+			}
+
+			j.log.WithFields(logrus.Fields{
+				"insight_id": insight.ID,
+				"base_id":    selection.Insight.ID,
+				"category":   category,
+				"level":      level,
+				"key":        selection.Key,
+				"title":      insight.Title,
+			}).Info("variation generated and saved")
+		} else {
+			// selection.FromBank is false but no key - treat as new insight needed
+			j.log.Info("selection returned without bank insight or key, will generate new insight")
+		}
+	}
+
+	// If no insight was set from bank or variation, generate new one
+	if insight == nil {
+		// Generate completely new insight via LLM
+		j.log.Info("generating new insight via LLM")
+
+		// Use rotation-based category selection instead of always using first category
 		if len(j.categories) == 0 {
 			return fmt.Errorf("no categories configured")
 		}
-		category = j.categories[0]
-		level = "intermediate"
 
-		generated, err := j.contentGen.GenerateInsight(ctx, category, level, "general")
+		selectedCategory, err := j.rotationEngine.SelectCategoryForLLM(ctx, j.categories)
 		if err != nil {
-			return fmt.Errorf("failed to generate insight: %w", err)
+			j.log.WithError(err).Warn("failed to select category via rotation, using fallback")
+			selectedCategory = j.categories[0]
+		}
+		category = selectedCategory
+
+		// Select level using rotation engine's selector
+		_, stateErr := j.rotationEngine.GetCategoryPriority(ctx, category)
+		var rotationState *repository.RotationState
+		if stateErr == nil {
+			state, err := j.rotationEngine.GetCategoryPriority(ctx, category)
+			if err == nil && state > 0 {
+				states, getAllErr := j.rotationEngine.GetAllRotationStates(ctx)
+				if getAllErr == nil {
+					for i := range states {
+						if states[i].Category == category {
+							rotationState = &states[i]
+							break
+						}
+					}
+				}
+			}
+		}
+
+		selector := rotation.NewSelector(rotation.EngineConfig{
+			LevelDistribution:   map[string]int{"beginner": 20, "intermediate": 50, "advanced": 30},
+			MinDaysBeforeRepeat: 7,
+			DedupWindowHours:    24,
+			DefaultWeight:       1.0,
+		})
+		level = selector.SelectLevel(rotationState)
+
+		// Pick a random subtopic/key from the category config
+		key := j.pickRandomSubtopic(category)
+
+		j.log.WithFields(logrus.Fields{
+			"category": category,
+			"level":    level,
+			"key":      key,
+		}).Info("selected category and key for LLM generation")
+
+		// Generate insight using the key for better prompt variation
+		generated, err := j.contentGen.GenerateInsightWithKey(ctx, category, level, key)
+		if err != nil {
+			return fmt.Errorf("failed to generate insight with key %s: %w", key, err)
 		}
 
 		// Validate generated content
@@ -102,6 +215,7 @@ func (j *SendInsightJob) Execute(ctx context.Context) error {
 			Level:     level,
 			Title:     generated.Title,
 			Insight:   generated.Insight,
+			Key:       &key,
 			KeyPoints: generated.KeyPoints,
 			Tags:      generated.Tags,
 		}
@@ -136,26 +250,47 @@ func (j *SendInsightJob) Execute(ctx context.Context) error {
 		msgData.CodeExample = *insight.CodeExample
 	}
 
-	message := j.telegramFmt.Format(msgData)
+	messages := j.telegramFmt.Format(msgData)
 
 	// Step 3: Send via Telegram with retry
-	msgID, err := j.telegramClient.SendMessage(ctx, message)
-	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+	var lastMsgID int64
+	for i, msg := range messages {
+		msgID, err := j.telegramClient.SendMessage(ctx, msg)
+		if err != nil {
+			return fmt.Errorf("failed to send message part %d/%d: %w", i+1, len(messages), err)
+		}
+		lastMsgID = msgID
+		j.log.WithFields(logrus.Fields{
+			"message_id":  msgID,
+			"part":        i + 1,
+			"total_parts": len(messages),
+			"insight_id":  insight.ID,
+		}).Info("message part sent successfully")
 	}
-
-	j.log.WithFields(logrus.Fields{
-		"message_id": msgID,
-		"insight_id": insight.ID,
-	}).Info("message sent successfully")
 
 	// Step 4: Record delivery
 	if err := j.rotationEngine.RecordDelivery(ctx, category, level, insight.ID); err != nil {
 		j.log.WithError(err).Error("failed to record delivery")
-		// Don't return error, message was already sent
 	}
 
+	j.log.WithFields(logrus.Fields{
+		"insight_id":  insight.ID,
+		"total_parts": len(messages),
+		"last_msg_id": lastMsgID,
+	}).Info("all message parts sent successfully")
+
 	return nil
+}
+
+// pickRandomSubtopic picks a random subtopic from the category configuration.
+func (j *SendInsightJob) pickRandomSubtopic(categoryName string) string {
+	for _, cat := range j.categoryConfigs {
+		if cat.Name == categoryName && len(cat.Subtopics) > 0 {
+			idx := j.rng.Intn(len(cat.Subtopics))
+			return cat.Subtopics[idx]
+		}
+	}
+	return "general"
 }
 
 // ExecuteWithTimeout runs the job with a timeout.
