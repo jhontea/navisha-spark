@@ -14,6 +14,13 @@ const (
 	PromptTypeVariation PromptType = "variation"
 )
 
+// Categories that require code examples in their prompts
+var codeExampleCategories = map[string]bool{
+	"Golang":                       true,
+	"Coding Challenge":             true,
+	"Data Structures & Algorithms": true,
+}
+
 // PromptConfig holds configuration for prompt generation.
 type PromptConfig struct {
 	Model       string
@@ -31,9 +38,33 @@ func NewPromptBuilder(cfg PromptConfig) *PromptBuilder {
 	return &PromptBuilder{config: cfg}
 }
 
+// requiresCodeExample checks if a category requires code examples in its prompt.
+func requiresCodeExample(category string) bool {
+	return codeExampleCategories[category]
+}
+
+// buildCodeExampleSection returns the code example section for prompts that require it.
+func buildCodeExampleSection() string {
+	return `
+4. Code Example: Berikan code snippet yang relevan dan praktis (dalam bahasa Go jika applicable)`
+}
+
+// buildCodeExampleJSONField returns the code example JSON field for prompts that require it.
+func buildCodeExampleJSONField() string {
+	return `,
+    "code_example": "..."`
+}
+
 // BuildInsightPrompt builds a prompt for generating a new insight.
 func (pb *PromptBuilder) BuildInsightPrompt(category, level, subtopic string) string {
 	var b strings.Builder
+
+	codeExampleReq := ""
+	codeExampleJSON := ""
+	if requiresCodeExample(category) {
+		codeExampleReq = buildCodeExampleSection()
+		codeExampleJSON = buildCodeExampleJSONField()
+	}
 
 	b.WriteString(fmt.Sprintf(`Buatkan insight pembelajaran level %s tentang topik %s: %s dalam bahasa Indonesia.
 
@@ -42,10 +73,9 @@ Requirements:
 2. Insight: Penjelasan komprehensif (300-500 kata) dengan:
    - Definisi dan konsep inti
    - Contoh praktis dan use case
-   - Code snippets jika applicable
    - Kapan menggunakan dan kapan tidak menggunakan
    - Common pitfalls dan best practices
-3. Key Points: 3-5 bullet points yang merangkum insight
+3. Key Points: 3-5 bullet points yang merangkum insight%s
 4. Follow-ups: 2-3 pertanyaan dengan jawaban detail (masing-masing 100-200 kata)
 5. Tags: 3-5 tag yang relevan
 
@@ -53,13 +83,12 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 {
     "title": "...",
     "insight": "...",
-    "key_points": ["..."],
-    "code_example": "...",
+    "key_points": ["..."]%s,
     "follow_ups": [
         {"q": "...", "a": "..."}
     ],
     "tags": ["..."]
-}`, level, category, subtopic))
+}`, level, category, subtopic, codeExampleReq, codeExampleJSON))
 
 	return b.String()
 }
@@ -67,6 +96,11 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 // BuildVariationPrompt builds a prompt for creating a variation of an existing insight.
 func (pb *PromptBuilder) BuildVariationPrompt(category, level string, existingInsight string) string {
 	var b strings.Builder
+
+	codeExampleJSON := ""
+	if requiresCodeExample(category) {
+		codeExampleJSON = buildCodeExampleJSONField()
+	}
 
 	b.WriteString(fmt.Sprintf(`Buatkan variasi dari insight %s level tentang %s berikut dalam bahasa Indonesia.
 Variasi ini harus mencakup aspek atau sudut pandang yang berbeda tetapi terkait dengan topik yang sama.
@@ -85,13 +119,12 @@ Respond ONLY with valid JSON in this exact format:
 {
     "title": "...",
     "insight": "...",
-    "key_points": ["..."],
-    "code_example": "...",
+    "key_points": ["..."]%s,
     "follow_ups": [
         {"q": "...", "a": "..."}
     ],
     "tags": ["..."]
-}`, level, category, existingInsight))
+}`, level, category, existingInsight, codeExampleJSON))
 
 	return b.String()
 }
@@ -100,6 +133,13 @@ Respond ONLY with valid JSON in this exact format:
 func (pb *PromptBuilder) BuildInsightPromptWithKey(category, level, key string) string {
 	var b strings.Builder
 
+	codeExampleReq := ""
+	codeExampleJSON := ""
+	if requiresCodeExample(category) {
+		codeExampleReq = buildCodeExampleSection()
+		codeExampleJSON = buildCodeExampleJSONField()
+	}
+
 	b.WriteString(fmt.Sprintf(`Buatkan insight pembelajaran level %s tentang topik %s dengan fokus pada: %s dalam bahasa Indonesia.
 
 Requirements:
@@ -107,10 +147,9 @@ Requirements:
 2. Insight: Penjelasan komprehensif (300-500 kata) dengan:
    - Definisi dan konsep inti
    - Contoh praktis dan use case
-   - Code snippets jika applicable
    - Kapan menggunakan dan kapan tidak menggunakan
    - Common pitfalls dan best practices
-3. Key Points: 3-5 bullet points yang merangkum insight
+3. Key Points: 3-5 bullet points yang merangkum insight%s
 4. Follow-ups: 2-3 pertanyaan dengan jawaban detail (masing-masing 100-200 kata)
 5. Tags: 3-5 tag yang relevan
 
@@ -118,13 +157,12 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 {
     "title": "...",
     "insight": "...",
-    "key_points": ["..."],
-    "code_example": "...",
+    "key_points": ["..."]%s,
     "follow_ups": [
         {"q": "...", "a": "..."}
     ],
     "tags": ["..."]
-}`, level, category, key))
+}`, level, category, key, codeExampleReq, codeExampleJSON))
 
 	return b.String()
 }
@@ -132,6 +170,11 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 // BuildVariationPromptWithKey builds a prompt for creating a variation of an existing insight for a specific key.
 func (pb *PromptBuilder) BuildVariationPromptWithKey(category, level, key, existingInsight string) string {
 	var b strings.Builder
+
+	codeExampleJSON := ""
+	if requiresCodeExample(category) {
+		codeExampleJSON = buildCodeExampleJSONField()
+	}
 
 	b.WriteString(fmt.Sprintf(`Buatkan variasi dari insight %s level tentang %s dengan topik %s berikut dalam bahasa Indonesia.
 Variasi ini harus mencakup aspek atau sudut pandang yang berbeda tetapi terkait dengan topik yang sama.
@@ -150,13 +193,12 @@ Respond ONLY with valid JSON in this exact format:
 {
     "title": "...",
     "insight": "...",
-    "key_points": ["..."],
-    "code_example": "...",
+    "key_points": ["..."]%s,
     "follow_ups": [
         {"q": "...", "a": "..."}
     ],
     "tags": ["..."]
-}`, level, category, key, existingInsight))
+}`, level, category, key, existingInsight, codeExampleJSON))
 
 	return b.String()
 }
@@ -187,6 +229,7 @@ Respond ONLY with valid JSON in this exact format:
 }
 
 // BuildSystemPrompt builds the system prompt for the LLM.
+// The category parameter is optional - if provided, it will customize the prompt.
 func (pb *PromptBuilder) BuildSystemPrompt() string {
 	return `You are a senior backend engineering tutor creating high-quality learning content in Indonesian language.
 Your audience is experienced backend engineers who want to deepen their knowledge.
@@ -197,8 +240,7 @@ Guidelines:
 3. Explain trade-offs and when to use different approaches
 4. Focus on concepts that matter for senior-level understanding
 5. Use clear, professional Indonesian language
-6. Include code examples in Go when relevant
-7. Provide code examples in proper syntax (no markdown code blocks in the JSON values)
+6. Provide code examples in proper syntax (no markdown code blocks in the JSON values) - only include code_example field for coding-related categories (Golang, Coding Challenge, Data Structures & Algorithms)
 
 CRITICAL INSTRUCTIONS:
 - Your response must be ONLY valid JSON
