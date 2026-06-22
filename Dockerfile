@@ -26,17 +26,15 @@ RUN apk --no-cache add ca-certificates tzdata
 # Set timezone to Asia/Jakarta
 ENV TZ=Asia/Jakarta
 
-WORKDIR /root/
-
-# Copy binary from builder
-COPY --from=builder /app/spark .
-
-# Copy config files
-COPY --from=builder /app/config/ ./config/
+WORKDIR /app
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S spark && \
     adduser -u 1001 -S spark -G spark
+
+# Copy binary and config with correct ownership
+COPY --from=builder --chown=spark:spark /app/spark .
+COPY --from=builder --chown=spark:spark /app/config/ ./config/
 
 USER spark
 
