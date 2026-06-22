@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  spark:
+    build: .
+    container_name: navisha-spark
+    expose:
+      - "8080"
+    environment:
+      - APP_NAME=${APP_NAME:-navisha-spark}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_PORT=${APP_PORT:-8080}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - DATABASE_URL=${DATABASE_URL}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openrouter/owl-alpha}
+      - SCHEDULE_CRON=${SCHEDULE_CRON:-0 */3 * * *}
+      - TIMEZONE=${TIMEZONE:-Asia/Jakarta}
+      - ACTIVE_HOURS_START=${ACTIVE_HOURS_START:-0}
+      - ACTIVE_HOURS_END=${ACTIVE_HOURS_END:-23}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_DELAYS=${RETRY_DELAYS:-1m,5m,15m}
+      - DEDUP_WINDOW_HOURS=${DEDUP_WINDOW_HOURS:-24}
+      - LEVEL_DISTRIBUTION=${LEVEL_DISTRIBUTION:-beginner:20,intermediate:50,advanced:30}
+      - MIN_DAYS_BEFORE_REPEAT=${MIN_DAYS_BEFORE_REPEAT:-7}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - navisha-network
+    labels:
+      - "com.navisha.service=spark"
+      - "com.navisha.component=telegram-bot"
+
+  nginx:
+    image: nginx:alpine
+    container_name: navisha-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - certbot-webroot:/var/www/certbot:ro
+      - certbot-certs:/etc/letsencrypt:ro
+    restart: unless-stopped
+    depends_on:
+      - spark
+    networks:
+      - navisha-network
+    labels:
+      - "com.navisha.service=nginx"
+      - "com.navisha.component=reverse-proxy"
+
+  certbot:
+    image: certbot/certbot
+    container_name: navisha-certbot
+    volumes:
+      - certbot-webroot:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - navisha-network
+    labels:
+      - "com.navisha.service=certbot"
+      - "com.navisha.component=ssl"
+
+networks:
+  navisha-network:
+    driver: bridge
+
+volumes:
+  certbot-webroot:
+  certbot-certs:
