@@ -53,16 +53,29 @@ Internet
 # SSH ke VPS
 ssh root@202.155.13.11
 
-# Download setup script
-git clone https://github.com/yourusername/navisha-spark.git
-cd navisha-spark
-
-# Jalankan setup (install Docker, Nginx, Certbot, firewall)
+# Jalankan setup (install Docker, Nginx, Certbot, firewall, generate SSH key)
 chmod +x deploy/vps-setup.sh
 ./deploy/vps-setup.sh
 ```
 
-### Step 2: Konfigurasi Environment
+**Setelah setup selesai, script akan menampilkan SSH public key. Kamu perlu:**
+
+1. Copy public key yang ditampilkan
+2. Buka https://github.com/settings/keys
+3. Klik "New SSH key"
+4. Title: `navisha-spark-vps`
+5. Paste public key
+6. Klik "Add SSH key"
+
+### Step 2: Clone Repository
+
+```bash
+# Clone dari GitHub (setelah SSH key ditambahkan)
+git clone git@github.com:jhontea/navisha-spark.git
+cd navisha-spark
+```
+
+### Step 3: Konfigurasi Environment
 
 ```bash
 # Copy env example
@@ -78,7 +91,7 @@ nano .env
 # OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
-### Step 3: Build dan Start Aplikasi
+### Step 4: Build dan Start Aplikasi
 
 ```bash
 # Build Docker image dan start semua service
@@ -91,7 +104,7 @@ docker-compose -f deploy/docker-compose.prod.yml ps
 docker-compose -f deploy/docker-compose.prod.yml logs -f spark
 ```
 
-### Step 4: Setup SSL
+### Step 5: Setup SSL
 
 ```bash
 # Pastikan DNS sudah pointing ke VPS terlebih dahulu!
@@ -99,7 +112,7 @@ chmod +x deploy/ssl/certbot-init.sh
 ./deploy/ssl/certbot-init.sh
 ```
 
-### Step 5: Verifikasi
+### Step 6: Verifikasi
 
 ```bash
 # Test health check

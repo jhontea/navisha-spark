@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   spark:
-    build: .
+    build:
+      context: ..
+      dockerfile: Dockerfile
     container_name: navisha-spark
     expose:
       - "8080"
