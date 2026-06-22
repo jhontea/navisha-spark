@@ -1,11 +1,11 @@
-version: '3.8'
-
 services:
   spark:
     build:
       context: ..
       dockerfile: Dockerfile
     container_name: navisha-spark
+    env_file:
+      - ../.env
     ports:
       - "127.0.0.1:8080:8080"
     environment:
