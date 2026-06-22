@@ -42,11 +42,11 @@ func (r *HistoryRepository) IsDuplicate(ctx context.Context, insightID int, wind
 		SELECT EXISTS(
 			SELECT 1 FROM sent_history
 			WHERE insight_id = $1
-			AND sent_at > NOW() - ($2 || ' hours')::INTERVAL
+			AND sent_at > NOW() - ($2 * INTERVAL '1 hour')
 		)`
 
 	var exists bool
-	err := r.db.QueryRowContext(ctx, query, insightID, fmt.Sprintf("%d", windowHours)).Scan(&exists)
+	err := r.db.QueryRowContext(ctx, query, insightID, windowHours).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check duplicate for insight %d: %w", insightID, err)
 	}
@@ -76,10 +76,10 @@ func (r *HistoryRepository) GetRecentByInsightID(ctx context.Context, insightID 
 func (r *HistoryRepository) GetSentInsightIDsInWindow(ctx context.Context, windowHours int) ([]int, error) {
 	query := `
 		SELECT DISTINCT insight_id FROM sent_history
-		WHERE sent_at > NOW() - ($1 || ' hours')::INTERVAL`
+		WHERE sent_at > NOW() - ($1 * INTERVAL '1 hour')`
 
 	var ids []int
-	err := r.db.SelectContext(ctx, &ids, query, fmt.Sprintf("%d", windowHours))
+	err := r.db.SelectContext(ctx, &ids, query, windowHours)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sent insight ids in window: %w", err)
 	}
@@ -89,9 +89,9 @@ func (r *HistoryRepository) GetSentInsightIDsInWindow(ctx context.Context, windo
 
 // CleanupOld removes sent history older than the specified days.
 func (r *HistoryRepository) CleanupOld(ctx context.Context, days int) (int, error) {
-	query := `DELETE FROM sent_history WHERE sent_at < NOW() - ($1 || ' days')::INTERVAL`
+	query := `DELETE FROM sent_history WHERE sent_at < NOW() - ($1 * INTERVAL '1 day')`
 
-	result, err := r.db.ExecContext(ctx, query, fmt.Sprintf("%d", days))
+	result, err := r.db.ExecContext(ctx, query, days)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup old sent history: %w", err)
 	}
@@ -108,10 +108,10 @@ func (r *HistoryRepository) CleanupOld(ctx context.Context, days int) (int, erro
 func (r *HistoryRepository) CountInWindow(ctx context.Context, windowHours int) (int, error) {
 	query := `
 		SELECT COUNT(DISTINCT insight_id) FROM sent_history
-		WHERE sent_at > NOW() - ($1 || ' hours')::INTERVAL`
+		WHERE sent_at > NOW() - ($1 * INTERVAL '1 hour')`
 
 	var count int
-	err := r.db.QueryRowContext(ctx, query, fmt.Sprintf("%d", windowHours)).Scan(&count)
+	err := r.db.QueryRowContext(ctx, query, windowHours).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count sent insights in window: %w", err)
 	}

@@ -155,9 +155,13 @@ func GetLevelEmoji(level string) string {
 
 // formatLevel formats a level string with emoji and proper casing.
 func formatLevel(level string) string {
-	level = strings.Title(strings.ToLower(level))
-	emoji := GetLevelEmoji(level)
-	return fmt.Sprintf("%s %s", emoji, level)
+	lower := strings.ToLower(level)
+	// Capitalize first letter without using deprecated strings.Title
+	if len(lower) > 0 {
+		lower = strings.ToUpper(lower[:1]) + lower[1:]
+	}
+	emoji := GetLevelEmoji(lower)
+	return fmt.Sprintf("%s %s", emoji, lower)
 }
 
 // formatParagraphs formats text with proper paragraph breaks for better readability.

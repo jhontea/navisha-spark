@@ -11,7 +11,7 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang secara otomati
 | Fitur | Deskripsi |
 |-------|-----------|
 | ⏰ **Scheduled Delivery** | Kirim 1 insight teknis tiap 3 jam (00:00, 03:00, ..., 21:00 WIB) |
-| 📚 **13 Topic Categories** | Golang, Database, System Design, Security, Kafka, Redis, dll. |
+| 📚 **14 Topic Categories** | Golang, Database, System Design, Security, Kafka, Redis, Software Architecture, dll. |
 | 🎯 **3 Difficulty Levels** | Beginner (20%), Intermediate (50%), Advanced (30%) |
 | 🔄 **Smart Rotation** | Weighted round-robin + spaced repetition heuristic |
 | 🚫 **Deduplication** | Tidak ada konten yang sama dalam 24 jam |
@@ -103,9 +103,10 @@ curl http://localhost:8080/healthz
 | 10 | **Caching (Redis)** | Beginner / Intermediate / Advanced |
 | 11 | **Message Broker (Kafka)** | Beginner / Intermediate / Advanced |
 | 12 | **Distributed Systems** | Beginner / Intermediate / Advanced |
-| 13 | **AI/ML untuk Backend Engineer** | Beginner / Intermediate / Advanced |
+| 13 | **Software Architecture** | Beginner / Intermediate / Advanced |
+| 14 | **AI/ML untuk Backend Engineer** | Beginner / Intermediate / Advanced |
 
-Kategori bisa ditambah/dikurangi lewat `config/categories.yaml` tanpa restart.
+Kategori bisa ditambah/dikurangi lewat `config/config.yaml` tanpa restart.
 
 ---
 
@@ -139,8 +140,7 @@ navisha-spark/
 │   ├── scheduler/             # Cron scheduling
 │   └── retry/                 # Exponential backoff
 ├── config/
-│   ├── categories.yaml        # Topic taxonomy
-│   └── schedule.yaml          # Schedule & rotation config
+│   └── config.yaml            # Unified config (categories, schedule, rotation, LLM, etc.)
 ├── migrations/                # Database migrations
 ├── agent/                     # AI assistant context & skills
 ├── docs/                      # Documentation
@@ -168,10 +168,9 @@ navisha-spark/
 
 ### YAML Config (Hot-Reload)
 
-- **`config/categories.yaml`** — Tambah/hapus topik, atur weight
-- **`config/schedule.yaml`** — Ubah jadwal, active hours, level distribution
+- **`config/config.yaml`** — Satu file konfigurasi untuk semua: topik (categories), jadwal, level distribution, LLM, format, dan logging.
 
-> Perubahan YAML langsung生效 tanpa restart!
+> Perubahan YAML langsung berlaku tanpa restart!
 
 ---
 
@@ -294,7 +293,7 @@ WHERE key IS NOT NULL;
 
 ### v1.0 (Sekarang)
 - ✅ Scheduled delivery tiap 3 jam
-- ✅ 13 kategori topik backend
+- ✅ 14 kategori topik backend
 - ✅ Smart rotation + deduplication
 - ✅ LLM content generation
 - ✅ Docker deployment

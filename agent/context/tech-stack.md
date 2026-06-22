@@ -15,55 +15,43 @@ Dokumentasi ini menjelaskan setiap teknologi yang digunakan dalam Navisha Spark,
 **Why Go?**
 - **Performance:** Compiled language, performa setara C/C++
 - **Simplicity:** Syntax sederhana, mudah dibaca dan dipelajari
-- **Concurrency:** Built-in goroutine dan channel untuk concurrent programming
+- **Concurrency:** Built-in goroutine dan channel
 - **Standard Library:** Library yang lengkap (HTTP, JSON, SQL, dll.)
 - **Single Binary:** Compile ke single binary, mudah di-deploy
 - **Cross-platform:** Compile untuk berbagai OS dan architecture
 
 **Key Features Used:**
 - Goroutine untuk concurrent operations
-- Channels untuk communication antar goroutine
 - `context` package untuk cancellation dan timeout
-- `net/http` untuk HTTP server (health check)
+- `net/http` untuk HTTP server (health check + trigger)
 - `database/sql` + `sqlx` untuk database access
-
-**Alternatives Considered:**
-- Python: Lebih lambat, butuh GIL untuk concurrency
-- Node.js: Single-threaded, tidak cocok untuk CPU-bound tasks
-- Rust: Learning curve tinggi, overkill untuk project ini
+- Generics (`DoWithData[T]` di retry package)
 
 ---
 
 ### 2. PostgreSQL (Supabase)
 
-**Purpose:** Primary database untuk menyimpan questions, delivery logs, dan rotation state
+**Purpose:** Primary database — menyimpan insights, delivery logs, dan rotation state
 
 **Why PostgreSQL?**
 - **ACID Compliant:** Jamin konsistensi data
-- **JSONB Support:** Simpan follow_ups sebagai JSON dengan query yang efisien
-- **Array Support:** Simpan tags sebagai array PostgreSQL
-- **Reliable:** Battle-tested, mature, dan stabil
-- **Managed (Supabase):** Tidak perlu manage database server sendiri
+- **JSONB Support:** Simpan follow_ups sebagai JSON
+- **Array Support:** Simpan tags, key_points sebagai array
+- **Managed (Supabase):** Tidak perlu manage database server
 - **Free Tier:** Cukup untuk single user (500MB database)
 
 **Key Features Used:**
 - `SERIAL` untuk auto-increment primary key
 - `JSONB` untuk flexible schema (follow_ups)
-- `TEXT[]` untuk array of strings (tags)
+- `TEXT[]` untuk array of strings (tags, key_points)
 - `CHECK` constraints untuk validasi (level enum)
 - `TIMESTAMP DEFAULT NOW()` untuk audit fields
 - `ON DELETE CASCADE` untuk referential integrity
-- Indexes untuk query optimization
-
-**Alternatives Considered:**
-- MySQL: Tidak support JSONB dan array sebaik PostgreSQL
-- SQLite: Tidak cocok untuk concurrent writes
-- MongoDB: Overkill, tidak butuh document database
-- Supabase vs self-hosted: Supabase lebih mudah, managed backup
+- `INTERVAL` arithmetic untuk deduplication window queries
 
 **Connection:**
 ```
-url supabase
+postgresql://username:password@host:6543/postgres (Supabase pooler)
 ```
 
 ---
@@ -73,100 +61,78 @@ url supabase
 **Purpose:** In-process scheduler untuk trigger content delivery setiap 3 jam
 
 **Why robfig/cron?**
-- **Standard Library:** Paling populer untuk cron di Go
+- **Standard:** Paling populer untuk cron di Go
 - **Flexible:** Support standard cron expressions
 - **Lightweight:** Tidak ada dependency berat
-- **In-process:** Tidak perlu external process atau OS-level timer
-- **Timezone Support:** Bisa set timezone (Asia/Jakarta)
-
-**Key Features Used:**
-- `cron.New()` untuk create scheduler
-- `cron.AddFunc()` untuk add job
-- `cron.Start()` untuk start scheduler
-- Timezone support via `cron.WithLocation()`
-
-**Alternatives Considered:**
-- systemd timer: Butuh akses host OS, tidak cocok untuk Docker
-- Kubernetes CronJob: Overkill untuk single VPS
-- go-cron: Kurva belajar lebih tinggi, dokumentasi kurang baik
+- **In-process:** Tidak perlu external process
+- **Timezone Support:** Set timezone (Asia/Jakarta)
+- **Middleware:** `SkipIfStillRunning`, `Recover` built-in
 
 **Usage:**
 ```go
 import "github.com/robfig/cron/v3"
 
-c := cron.New(cron.WithLocation(time.FixedLocation("WIB", 7*60*60)))
-c.AddFunc("0 */3 * * *", sendQuestionJob)
+c := cron.New(
+    cron.WithLocation(loc),
+    cron.WithChain(
+        cron.SkipIfStillRunning(logger),
+        cron.Recover(logger),
+    ),
+)
+c.AddFunc("0 */3 * * *", myJob)
 c.Start()
 ```
 
 ---
 
-### 4. go-telegram-bot-api/v6
+### 4. go-telegram-bot-api (v1 / non-v5)
 
-**Purpose:** Official Telegram Bot API wrapper untuk Go
+**Purpose:** Telegram Bot API wrapper untuk Go
 
-**Why go-telegram-bot-api?**
-- **Official:** Maintained oleh Telegram team
-- **Complete:** Support semua Bot API methods
-- **Type-safe:** Strong typing untuk request dan response
-- **Easy to Use:** API yang intuitive
+**Package:** `github.com/go-telegram-bot-api/telegram-bot-api` (v4.6.4)
 
 **Key Features Used:**
-- `telegram.NewBotAPI()` untuk create bot client
-- `botAPI.Send()` untuk send message
-- `telegram.NewMessage()` untuk create message
-- `MessageConfig` untuk configure message
-
-**Alternatives Considered:**
-- Raw HTTP calls: Lebih ribet, manual parsing JSON
-- grammY (TypeScript): Bukan Go
-- python-telegram-bot: Bukan Go
+- `tgbotapi.NewBotAPI(token)` untuk create bot client
+- `botAPI.Send(msg)` untuk send message
+- `tgbotapi.NewMessage(chatID, text)` untuk create message
+- `msg.ParseMode = "Markdown"` untuk Markdown formatting
 
 **Usage:**
 ```go
-import "github.com/go-telegram-bot-api/telegram-bot-api/v6"
+import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 
 bot, err := tgbotapi.NewBotAPI(token)
 msg := tgbotapi.NewMessage(chatID, text)
 msg.ParseMode = "Markdown"
+msg.DisableWebPagePreview = true
 bot.Send(msg)
 ```
 
 ---
 
-### 5. OpenRouter
+### 5. OpenRouter (via direct HTTP)
 
-**Purpose:** LLM provider untuk generate questions on-the-fly
+**Purpose:** LLM provider untuk generate insights on-the-fly
 
 **Why OpenRouter?**
 - **Unified API:** Single API untuk multiple LLM providers
-- **Free Models:** Access ke free models (Mistral, Llama, Phi-3)
-- **Easy to Switch:** Ganti model tanpa ubah code
+- **Free Models:** `openrouter/owl-alpha` gratis
+- **Easy to Switch:** Ganti model via config tanpa ubah code
 - **Cost-effective:** Free tier untuk usage kecil
 
-**Key Features Used:**
-- Chat Completions API
-- Model: `openrouter/owl-alpha`
-- Streaming (optional, untuk future)
+**Implementation:** Direct HTTP call (no SDK) menggunakan `net/http`:
+```go
+req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
+    "https://openrouter.ai/api/v1/chat/completions",
+    bytes.NewReader(body))
+req.Header.Set("Authorization", "Bearer "+apiKey)
+req.Header.Set("Content-Type", "application/json")
+```
 
 **Alternatives Considered:**
-- OpenAI API: Berbayar, tidak ada free tier
+- OpenAI SDK: Berbayar, overkill
 - Anthropic Claude: Berbayar
-- Local LLM (Ollama): Butuh GPU, resource-intensive
-- Hugging Face Inference API: Rate limit ketat
-
-**Usage:**
-```go
-import "github.com/openai/openai-go"
-
-client := openai.NewClient(apiKey)
-resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-    Model: openai.String("openrouter/owl-alpha"),
-    Messages: []openai.ChatCompletionMessageParamUnion{
-        openai.UserMessage(prompt),
-    },
-})
-```
+- Local LLM (Ollama): Butuh GPU
 
 ---
 
@@ -176,186 +142,141 @@ resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 
 **Why sqlx?**
 - **Type-safe:** Auto-map rows ke struct
-- **Named Queries:** Support named parameters (`:name`)
-- **Struct Tags:** Mapping dengan `db:"column_name"`
-- **Lightweight:** Tidak seperti ORM (GORM), tetap kontrol penuh atas SQL
-- **Performance:** Tidak ada overhead ORM
-
-**Key Features Used:**
-- `db.Get()` untuk single row
-- `db.Select()` untuk multiple rows
-- `db.NamedQuery()` untuk named parameters
-- `db.MustExec()` untuk exec tanpa error handling
-
-**Alternatives Considered:**
-- GORM: Terlalu magic, kontrol kurang, learning curve tinggi
-- Raw `database/sql`: Manual scanning, verbose
-- pgx: Lebih cepat tapi API kurang friendly
-- ent: Overkill untuk project ini
+- **`db:` tags:** Mapping kolom ke field struct
+- **`Get` / `Select`:** Query tunggal vs multiple rows
+- **Lightweight:** Tidak seperti ORM, tetap kontrol penuh atas SQL
 
 **Usage:**
 ```go
 import "github.com/jmoiron/sqlx"
 
-var q Question
-err := db.Get(&q, "SELECT * FROM questions WHERE id = $1", id)
+var insight Insight
+err := db.GetContext(ctx, &insight, "SELECT * FROM insights WHERE id = $1", id)
+
+var insights []Insight
+err = db.SelectContext(ctx, &insights, "SELECT * FROM insights WHERE category = $1", cat)
 ```
 
 ---
 
-### 7. Viper
+### 7. gopkg.in/yaml.v3
 
-**Purpose:** Configuration management (env vars + YAML files)
+**Purpose:** Parse unified YAML config (`config/config.yaml`)
 
-**Why Viper?**
-- **Multiple Sources:** Env vars, YAML, JSON, TOML
-- **Hot-reload:** Bisa reload config tanpa restart
-- **Default Values:** Support default values
-- **Widely Used:** Standard untuk config di Go ecosystem
-
-**Key Features Used:**
-- `viper.AutomaticEnv()` untuk bind env vars
-- `viper.ReadInConfig()` untuk read YAML
-- `viper.Unmarshal()` untuk parse ke struct
-- `viper.WatchConfig()` untuk hot-reload (optional)
-
-**Alternatives Considered:**
-- envconfig: Hanya support env vars, tidak ada YAML
-- koanf: Lebih baru, dokumentasi kurang
-- godotenv: Hanya load `.env`, tidak ada advanced features
+**Why yaml.v3 directly (no Viper)?**
+- **Simpler:** Tidak ada dependency besar
+- **Typed:** Langsung unmarshal ke typed struct
+- **Hot-reload:** Handled secara manual via `fsnotify`
 
 **Usage:**
 ```go
-import "github.com/spf13/viper"
+import "gopkg.in/yaml.v3"
 
-viper.SetConfigFile("config/schedule.yaml")
-viper.AutomaticEnv()
-viper.ReadInConfig()
-viper.Unmarshal(&cfg)
+data, _ := os.ReadFile("config/config.yaml")
+yaml.Unmarshal(data, &cfg)
 ```
 
 ---
 
-### 8. Logrus
+### 8. fsnotify
+
+**Purpose:** File system watcher untuk hot-reload `config/config.yaml`
+
+**Why fsnotify?**
+- **Cross-platform:** Windows, macOS, Linux
+- **Low-level:** Minimal overhead
+- **Debounced:** Impelmentasi debounce 100ms untuk avoid double-reload
+
+**Usage:**
+```go
+watcher, _ := fsnotify.NewWatcher()
+watcher.Add("config/config.yaml")
+for event := range watcher.Events {
+    if event.Op&fsnotify.Write == fsnotify.Write {
+        // debounce then reload
+    }
+}
+```
+
+---
+
+### 9. joho/godotenv
+
+**Purpose:** Load `.env` file ke environment variables saat startup
+
+**Note:** Hanya digunakan di development. Di production, env vars di-set langsung via Docker Compose atau systemd.
+
+```go
+godotenv.Load() // warn-only if .env doesn't exist
+```
+
+---
+
+### 10. Logrus
 
 **Purpose:** Structured logging
 
 **Why Logrus?**
 - **Structured:** JSON output untuk log aggregation
-- **Fields:** Bisa tambah fields (category, level, question_id)
+- **Fields:** Tambah context (category, insight_id)
 - **Levels:** Debug, Info, Warn, Error, Fatal
-- **Formatters:** JSON, Text, custom formatters
-
-**Key Features Used:**
-- `logrus.WithFields()` untuk structured logging
-- `logrus.Info()`, `logrus.Error()` untuk log levels
-- JSON formatter untuk production
-
-**Alternatives Considered:**
-- zap (Uber): Lebih cepat tapi API kurang intuitive
-- zerolog: Lebih baru, dokumentasi kurang
-- standard `log`: Tidak ada structured logging
+- **Formatters:** JSON (production), Text (development)
 
 **Usage:**
 ```go
 import "github.com/sirupsen/logrus"
 
-logrus.WithFields(logrus.Fields{
-    "category": "Golang",
-    "level": "intermediate",
-}).Info("Sending question")
+log.WithFields(logrus.Fields{
+    "category":   "Golang",
+    "insight_id": 42,
+}).Info("sending insight")
 ```
 
 ---
 
-### 9. Docker & Docker Compose
+### 11. Docker & Docker Compose
 
 **Purpose:** Containerization dan deployment
 
-**Why Docker?**
-- **Portability:** Run di anywhere (dev, staging, prod)
-- **Isolation:** Dependencies terisolasi per container
-- **Reproducibility:** Build once, run anywhere
-- **Easy Deployment:** Single command untuk start/stop
-
-**Why Docker Compose?**
-- **Multi-container:** Define multiple services di satu file
-- **Simple:** Tidak perlu Kubernetes untuk single service
-- **Environment:** Define env vars, volumes, networks
-- **Restart Policy:** Auto-restart on crash
-
 **Key Features Used:**
-- Multi-stage build untuk minimal image size
+- Multi-stage build untuk minimal image size (~10MB)
+- Non-root user (`spark`) untuk security
 - `restart: unless-stopped` untuk auto-restart
-- Health check untuk monitoring
-- Environment variables dari `.env`
+- Health check (`wget -q --spider http://localhost:8080/healthz`)
+- Environment variables dari `.env` via `env_file`
 
-**Alternatives Considered:**
-- Kubernetes: Overkill untuk single service
-- systemd: Butuh akses host, kurang portable
-- Bare metal: Sulit manage dependencies
+**Dockerfile highlights:**
+```dockerfile
+FROM golang:1.23-alpine AS builder
+# ...
+FROM alpine:latest
+RUN addgroup -g 1001 -S spark && adduser -u 1001 -S spark -G spark
+USER spark
+CMD ["./spark"]
+```
 
 ---
 
-### 10. lib/pq
+### 12. lib/pq
 
 **Purpose:** PostgreSQL driver untuk `database/sql`
 
 **Why lib/pq?**
 - **Pure Go:** Tidak ada C dependencies
 - **Mature:** Stable, widely used
-- **SSL Support:** Support SSL/TLS connections
-- **Complete:** Support semua PostgreSQL features
-
-**Key Features Used:**
-- Connection string dengan SSL
-- Array support (`tags TEXT[]`)
-- JSONB support
-
-**Alternatives Considered:**
-- pgx: Lebih cepat tapi kurang compatible dengan `database/sql`
-- go-pg: ORM-style, tidak cocok dengan sqlx
-
----
-
-## Supporting Technologies
-
-### 11. YAML
-
-**Purpose:** Configuration files (categories, schedule)
-
-**Why YAML?**
-- **Human-readable:** Mudah dibaca dan diedit
-- **Hierarchical:** Support nested structures
-- **Widely Supported:** Banyak library di semua bahasa
-
-**Libraries:**
-- `gopkg.in/yaml.v3` (via Viper)
-
----
-
-### 12. Markdown
-
-**Purpose:** Message formatting untuk Telegram
-
-**Why Markdown?**
-- **Simple:** Easy to write dan read
-- **Telegram Support:** Telegram Bot API support Markdown parsing
-- **Formatting:** Bold, italic, code blocks, lists
+- **Array Support:** `pq.StringArray` untuk `TEXT[]` columns
 
 **Usage:**
-```markdown
-📚 *Golang* — *Intermediate*
+```go
+import (
+    _ "github.com/lib/pq"        // driver registration
+    "github.com/lib/pq"
+)
 
-*Pertanyaan:*
-Apa itu goroutine?
-
-💡 *Jawaban:*
-Goroutine adalah thread ringan...
-
-🔍 *Follow-up:*
-• Bagaimana cara membuat goroutine?
-• Apa perbedaan goroutine dan thread?
+type Insight struct {
+    Tags      pq.StringArray `db:"tags"`
+    KeyPoints pq.StringArray `db:"key_points"`
+}
 ```
 
 ---
@@ -363,60 +284,42 @@ Goroutine adalah thread ringan...
 ## Technology Stack Summary
 
 | Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
+|-------|-----------|---------|------|
 | Language | Go | 1.23 | Core application |
 | Database | PostgreSQL (Supabase) | 15+ | Data storage |
 | Scheduler | robfig/cron | v3 | Job scheduling |
-| Telegram | go-telegram-bot-api | v6 | Bot API client |
-| LLM | OpenRouter | - | Content generation |
-| Database Driver | sqlx + lib/pq | v1.4.0 / v1.10.9 | Database access |
-| Config | Viper | v1.19.0 | Configuration management |
-| Logging | Logrus | v1.9.3 | Structured logging |
+| Telegram | go-telegram-bot-api | v4.6.4 | Bot API client |
+| LLM | OpenRouter (direct HTTP) | — | Content generation |
+| Database Driver | sqlx + lib/pq | v1.4.0 / v1.12.3 | Database access |
+| Config Parser | gopkg.in/yaml.v3 | v3.0.1 | YAML config |
+| File Watcher | fsnotify | v1.10.1 | Config hot-reload |
+| Env Loader | joho/godotenv | v1.5.1 | `.env` loading |
+| Logging | Logrus | v1.9.4 | Structured logging |
 | Deployment | Docker + Compose | Latest | Containerization |
-| Config Format | YAML | v3 | Configuration files |
-| Message Format | Markdown | - | Telegram messages |
 
 ---
 
-## Dependency Tree
-
-```
-github.com/navisha/spark
-├── github.com/go-telegram-bot-api/telegram-bot-api/v6
-│   └── (no dependencies)
-├── github.com/jmoiron/sqlx
-│   └── github.com/lib/pq
-│       └── (no dependencies)
-├── github.com/robfig/cron/v3
-│   └── (no dependencies)
-├── github.com/sirupsen/logrus
-│   └── github.com/sirupsen/logrus
-├── github.com/spf13/viper
-│   ├── github.com/fsnotify/fsnotify (optional, for hot-reload)
-│   ├── github.com/spf13/cast
-│   └── github.com/spf13/pflag
-└── github.com/openai/openai-go (for OpenRouter)
-    └── (HTTP client)
-```
-
----
-
-## Version Constraints
+## Actual go.mod Dependencies
 
 ```go
-// go.mod
 module github.com/navisha/spark
 
-go 1.23
+go 1.23.0
 
 require (
-    github.com/go-telegram-bot-api/telegram-bot-api/v6 v6.1.0
+    github.com/fsnotify/fsnotify v1.10.1
+    github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
     github.com/jmoiron/sqlx v1.4.0
-    github.com/lib/pq v1.10.9
+    github.com/lib/pq v1.12.3
     github.com/robfig/cron/v3 v3.0.1
-    github.com/sirupsen/logrus v1.9.3
-    github.com/spf13/cast v1.6.0
-    github.com/spf13/viper v1.19.0
+    github.com/sirupsen/logrus v1.9.4
+    gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+    github.com/joho/godotenv v1.5.1 // indirect
+    github.com/technoweenie/multipartstreamer v1.0.1 // indirect
+    golang.org/x/sys v0.29.0 // indirect
 )
 ```
 
@@ -433,7 +336,7 @@ require (
 ### Production (VPS)
 - Docker 24+
 - Docker Compose v2+
-- 512MB RAM (minimum)
+- 512MB RAM (minimum), 1GB recommended
 - 1 vCPU
 - 5GB disk
 
@@ -444,12 +347,10 @@ require (
 ### v2.0
 - **Redis:** Untuk caching frequent queries
 - **Prometheus + Grafana:** Untuk metrics dan monitoring
-- **Kafka:** Untuk message queue (jika scale ke multi-user)
 
 ### v3.0
-- **gRPC:** Untuk internal service communication
+- **gRPC:** Untuk internal service communication jika multi-service
 - **Kubernetes:** Jika perlu scale horizontally
-- **Terraform:** Untuk infrastructure as code
 
 ---
 

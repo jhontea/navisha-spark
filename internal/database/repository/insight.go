@@ -111,13 +111,13 @@ func (r *InsightRepository) GetUnsentInWindow(ctx context.Context, category, lev
 		WHERE i.category = $1 AND i.level = $2
 		AND (
 			i.last_sent_at IS NULL
-			OR i.last_sent_at < NOW() - ($3 || ' hours')::INTERVAL
+			OR i.last_sent_at < NOW() - ($3 * INTERVAL '1 hour')
 		)
 		ORDER BY i.last_sent_at ASC NULLS FIRST
 		LIMIT 10`
 
 	var insights []Insight
-	err := r.db.SelectContext(ctx, &insights, query, category, level, fmt.Sprintf("%d", windowHours))
+	err := r.db.SelectContext(ctx, &insights, query, category, level, windowHours)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unsent insights: %w", err)
 	}

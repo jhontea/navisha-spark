@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"time"
 )
 
 // GetEnv gets environment variable with fallback.
@@ -44,6 +43,3 @@ func MustConfig(configPath string) *Config {
 	}
 	return cfg
 }
-
-// Ensure time is used
-var _ = time.Now

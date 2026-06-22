@@ -136,9 +136,6 @@ func (j *SendInsightJob) Execute(ctx context.Context) error {
 				"key":        selection.Key,
 				"title":      insight.Title,
 			}).Info("variation generated and saved")
-		} else {
-			// selection.FromBank is false but no key - treat as new insight needed
-			j.log.Info("selection returned without bank insight or key, will generate new insight")
 		}
 	}
 
@@ -159,20 +156,13 @@ func (j *SendInsightJob) Execute(ctx context.Context) error {
 		}
 		category = selectedCategory
 
-		// Select level using rotation engine's selector
-		_, stateErr := j.rotationEngine.GetCategoryPriority(ctx, category)
+		// Select level based on rotation state for this category
 		var rotationState *repository.RotationState
-		if stateErr == nil {
-			state, err := j.rotationEngine.GetCategoryPriority(ctx, category)
-			if err == nil && state > 0 {
-				states, getAllErr := j.rotationEngine.GetAllRotationStates(ctx)
-				if getAllErr == nil {
-					for i := range states {
-						if states[i].Category == category {
-							rotationState = &states[i]
-							break
-						}
-					}
+		if states, err := j.rotationEngine.GetAllRotationStates(ctx); err == nil {
+			for i := range states {
+				if states[i].Category == category {
+					rotationState = &states[i]
+					break
 				}
 			}
 		}

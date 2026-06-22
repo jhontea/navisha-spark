@@ -63,7 +63,7 @@ docker-compose logs -f spark
 
 ## Configuration Setup (Deployment)
 
-Ada **3 jenis konfigurasi** yang perlu di-setup saat deployment:
+Ada **2 jenis konfigurasi** yang perlu di-setup saat deployment:
 
 ### 3.1 Environment Variables — `.env` (WAJIB)
 
@@ -130,16 +130,17 @@ docker-compose exec spark env | grep DATABASE_URL
 
 ---
 
-### 3.2 Topic Categories — `config/categories.yaml` (Hot-Reload)
+### 3.2 Unified YAML Config — `config/config.yaml` (Hot-Reload)
 
-File ini mengatur **topik apa saja** yang akan dikirim. Bisa diedit kapan saja **tanpa restart**.
+Satu file untuk semua konfigurasi: **topik**, **jadwal**, **level distribution**, **LLM**, **format**, dan **logging**.
+Bisa diedit kapan saja **tanpa restart**.
 
 #### Cara Setup Awal
 ```bash
-nano config/categories.yaml
+nano config/config.yaml
 ```
 
-#### Contoh Konfigurasi
+#### Konfigurasi Topik (categories)
 ```yaml
 categories:
   - name: "Golang"
@@ -147,7 +148,8 @@ categories:
     weight: 1.0             # Semakin besar, semakin sering muncul
     subtopics:
       - "concurrency"
-      - "goroutine/channel"
+      - "goroutine"
+      - "channel"
       - "GMP scheduler"
 
   - name: "Database"
@@ -167,30 +169,7 @@ categories:
       - "RAG"
 ```
 
-#### Cara Apply (HOT-RELOAD — tanpa restart!)
-```bash
-# Cukup edit file, perubahan langsung生效
-nano config/categories.yaml
-```
-
-#### Verifikasi
-```bash
-# Cek log untuk konfirmasi reload
-docker-compose logs spark | grep -i "config reloaded"
-```
-
----
-
-### 3.3 Schedule & Rotation — `config/schedule.yaml` (Hot-Reload)
-
-File ini mengatur **jadwal pengiriman** dan **logika rotasi** topik.
-
-#### Cara Setup Awal
-```bash
-nano config/schedule.yaml
-```
-
-#### Contoh Skenario
+#### Konfigurasi Jadwal (schedule)
 
 **Skenario 1: Default (tiap 3 jam, 24 jam)**
 ```yaml
@@ -224,13 +203,19 @@ schedule:
 
 #### Cara Apply (HOT-RELOAD — tanpa restart!)
 ```bash
-# Cukup edit file
-nano config/schedule.yaml
+# Cukup edit file, perubahan langsung berlaku
+nano config/config.yaml
+```
+
+#### Verifikasi
+```bash
+# Cek log untuk konfirmasi reload
+docker-compose logs spark | grep -i "config reloaded"
 ```
 
 ---
 
-### 3.4 Port & Network — `docker-compose.override.yml` (Perlu Restart)
+### 3.3 Port & Network — `docker-compose.override.yml` (Perlu Restart)
 
 Jika port `8080` sudah dipakai aplikasi lain, buat file override:
 
@@ -252,7 +237,7 @@ docker-compose up -d
 
 ---
 
-### 3.5 Flow Lengkap Setup Config Pertama Kali
+### 3.4 Flow Lengkap Setup Config Pertama Kali
 
 ```bash
 # 1. Clone project
@@ -264,21 +249,17 @@ cp .env.example .env
 nano .env
 # Isi: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DATABASE_URL, OPENROUTER_API_KEY
 
-# 3. (Opsional) Sesuaikan topik
-nano config/categories.yaml
-# Contoh: disable "AI/ML", enable sisanya
+# 3. (Opsional) Sesuaikan topik atau jadwal di satu file
+nano config/config.yaml
+# Contoh: disable "AI/ML", ganti active_hours ke 8-17
 
-# 4. (Opsional) Sesuaikan jadwal
-nano config/schedule.yaml
-# Contoh: ganti active_hours ke 8-17
-
-# 5. Setup database di Supabase
+# 4. Setup database di Supabase
 # Buka https://supabase.com → SQL Editor → paste isi migrations/001_init.sql → Run
 
-# 6. Start aplikasi
+# 5. Start aplikasi
 docker-compose up -d
 
-# 7. Verifikasi semua beres
+# 6. Verifikasi semua beres
 docker-compose ps                     # Status running
 curl http://localhost:8080/healthz    # Response: {"status":"ok",...}
 docker-compose logs spark | tail -20  # Cek startup logs
@@ -286,16 +267,17 @@ docker-compose logs spark | tail -20  # Cek startup logs
 
 ---
 
-### 3.6 Cara Update Config Saat Aplikasi Sudah Running
+### 3.5 Cara Update Config Saat Aplikasi Sudah Running
 
 | Yang Mau Diubah | File | Cara | Restart? |
 |----------------|------|------|:--------:|
 | Ganti bot token | `.env` | `nano .env` → `docker-compose restart spark` | ✅ Ya |
 | Ganti DB URL | `.env` | `nano .env` → `docker-compose restart spark` | ✅ Ya |
-| Tambah/hapus topik | `config/categories.yaml` | `nano config/categories.yaml` | ❌ Tidak |
-| Ganti jadwal | `config/schedule.yaml` | `nano config/schedule.yaml` | ❌ Tidak |
+| Tambah/hapus topik | `config/config.yaml` | `nano config/config.yaml` | ❌ Tidak |
+| Ganti jadwal/active hours | `config/config.yaml` | `nano config/config.yaml` | ❌ Tidak |
+| Ganti level distribution | `config/config.yaml` | `nano config/config.yaml` | ❌ Tidak |
 | Ganti port | `docker-compose.override.yml` | `nano docker-compose.override.yml` → `docker-compose up -d` | ✅ Ya |
-| Rollback config | `git checkout config/categories.yaml` | Langsung hot-reload | ❌ Tidak |
+| Rollback config | `git checkout config/config.yaml` | Langsung hot-reload | ❌ Tidak |
 
 ---
 
@@ -319,6 +301,7 @@ docker run --name postgres-dev \
 
 # Run migrations
 psql -U postgres -d navisha_spark -f migrations/001_init.sql
+psql -U postgres -d navisha_spark -f migrations/002_add_key_to_insights.sql
 ```
 
 ### 3. Configure Environment
@@ -352,7 +335,7 @@ go test ./...
 go test -cover ./...
 
 # Run specific package
-go test ./internal/rotation/...
+go test ./internal/telegram/...
 
 # Run with verbose output
 go test -v ./...
@@ -389,7 +372,7 @@ systemctl enable docker
 git clone https://github.com/yourusername/navisha-spark.git
 cd navisha-spark
 
-# Setup config (lihat section 3.5)
+# Setup config (lihat section 3.4)
 cp .env.example .env
 nano .env
 
@@ -456,7 +439,7 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
 # Copy binary
 scp spark root@your-vps-ip:/opt/navisha-spark/
 
-# Copy config files
+# Copy config files (hanya config.yaml, categories.yaml & schedule.yaml sudah dihapus)
 scp -r config root@your-vps-ip:/opt/navisha-spark/
 scp .env root@your-vps-ip:/opt/navisha-spark/
 ```
@@ -478,7 +461,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=spark
 WorkingDirectory=/opt/navisha-spark
 ExecStart=/opt/navisha-spark/spark
 Restart=always
@@ -511,25 +494,21 @@ sudo systemctl start navisha-spark
 
 1. Buka **Settings** → **Database**
 2. Scroll ke **Connection string**
-3. Copy **URI**
+3. Copy **URI** (gunakan pooler port 6543 untuk production)
 
 #### 3. Run Migrations
 
 **Option A: Via Supabase SQL Editor (Recommended)**
 ```bash
 # 1. Buka https://supabase.com → SQL Editor
-# 2. Copy paste isi migrations/001_init.sql
-# 3. Klik Run
+# 2. Copy paste isi migrations/001_init.sql → Klik Run
+# 3. Copy paste isi migrations/002_add_key_to_insights.sql → Klik Run
 ```
 
 **Option B: Via psql**
 ```bash
 psql $DATABASE_URL -f migrations/001_init.sql
-```
-
-**Option C: Via Docker**
-```bash
-docker-compose exec spark psql $DATABASE_URL -f migrations/001_init.sql
+psql $DATABASE_URL -f migrations/002_add_key_to_insights.sql
 ```
 
 #### 4. Verify Tables
@@ -537,6 +516,10 @@ docker-compose exec spark psql $DATABASE_URL -f migrations/001_init.sql
 ```sql
 SELECT tablename FROM pg_tables WHERE schemaname = 'public';
 -- Expected: insights, delivery_log, rotation_state, sent_history
+
+-- Cek kolom key ada di insights
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'insights' AND column_name = 'key';
 ```
 
 ---
@@ -553,7 +536,7 @@ go test ./...
 go test -cover ./...
 
 # Run specific package
-go test ./internal/rotation/...
+go test ./internal/telegram/...
 
 # Verbose output
 go test -v ./...
@@ -619,11 +602,24 @@ curl https://openrouter.ai/api/v1/models \
 ### 5. Health Check Failing
 
 ```bash
-# Cek status
+# Cek status container
 docker inspect --format='{{.State.Health.Status}}' navisha-spark
 
 # Test manual
 curl http://localhost:8080/healthz
+```
+
+### 6. Config Changes Not Taking Effect
+
+```bash
+# Pastikan file yang diedit adalah config/config.yaml
+# File categories.yaml dan schedule.yaml sudah tidak ada — semua ada di config.yaml
+
+# Cek log untuk hot-reload
+docker-compose logs spark | grep -i "config reloaded"
+
+# Jika tidak ada log reload, cek apakah file disimpan dengan benar
+cat config/config.yaml | grep -A 3 "categories:"
 ```
 
 ---
@@ -635,8 +631,10 @@ curl http://localhost:8080/healthz
 - [ ] Telegram bot token is in `.env` only
 - [ ] OpenRouter API key is in `.env` only
 - [ ] Database credentials are in `.env` only
-- [ ] Container runs as non-root user
-- [ ] Firewall allows only necessary ports (8080, 22)
+- [ ] Container runs as non-root user (`spark`)
+- [ ] Firewall allows only necessary ports (22, 80, 443)
+- [ ] `/trigger` endpoint dilindungi Nginx rate-limiting di production
+- [ ] SSL/TLS aktif via Let's Encrypt (lihat `deploy/README.md`)
 
 ---
 

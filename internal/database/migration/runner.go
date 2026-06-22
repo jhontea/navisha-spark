@@ -3,7 +3,6 @@ package migration
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
@@ -255,6 +254,3 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 `
-
-// Ensure time is used
-var _ = time.Now

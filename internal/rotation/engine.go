@@ -136,34 +136,6 @@ func (e *Engine) SelectNext(ctx context.Context, categories []string) (*Selectio
 			}, nil
 		}
 
-		// No unsent insight found, check if we should generate a variation
-		// Pick a random key from subtopics for this category
-		key := e.pickRandomKey(cp.category)
-		if key != "" {
-			// Check if there are existing insights with this key
-			existingInsights, err := e.insightRepo.GetByCategoryAndKey(ctx, cp.category, key)
-			if err == nil && len(existingInsights) > 0 {
-				// Found existing insights with this key, select the oldest one for variation
-				baseInsight := existingInsights[0]
-
-				e.log.WithFields(logrus.Fields{
-					"category": cp.category,
-					"level":    level,
-					"key":      key,
-					"base_id":  baseInsight.ID,
-					"source":   "variation",
-				}).Info("will generate variation for existing key")
-
-				return &SelectionResult{
-					Insight:  &baseInsight,
-					Category: cp.category,
-					Level:    level,
-					Key:      key,
-					FromBank: false, // Mark as variation needed
-				}, nil
-			}
-		}
-
 		// No insight found in bank for this category, try next category
 		e.log.WithFields(logrus.Fields{
 			"category": cp.category,
@@ -174,15 +146,6 @@ func (e *Engine) SelectNext(ctx context.Context, categories []string) (*Selectio
 	// If no insights found in any category, return nil to trigger LLM generation
 	e.log.Warn("no insights found in bank for any category, will need LLM generation")
 	return nil, nil
-}
-
-// pickRandomKey picks a random subtopic key for a given category.
-// This is used when we need to generate a variation or new insight.
-func (e *Engine) pickRandomKey(category string) string {
-	// This is a simplified version - in production, this would use the category config
-	// For now, we'll return a generic key based on the category
-	// The actual subtopic selection is done in the scheduler job
-	return ""
 }
 
 // calculatePriority calculates the priority score for a category.

@@ -266,37 +266,56 @@ func (c *Counter) Increment() {
 
 ### 8. Configuration
 
-#### Use Viper for Config
+#### Use yaml.v3 + os.Getenv for Config (no Viper)
 ```go
-type Config struct {
-    App      AppConfig
-    Telegram TelegramConfig
-    Database DatabaseConfig
-    LLM      LLMConfig
-    Schedule ScheduleConfig
-}
+// Config is loaded from config/config.yaml, then overridden by env vars.
+// This is the actual pattern used in internal/config/config.go
 
-type AppConfig struct {
-    Name  string
-    Env   string
-    Port  int
-    LogLevel string
-}
+func LoadConfig(configPath string) (*Config, error) {
+    cfg := &Config{}
+    setDefaults(cfg)
 
-func LoadConfig() (*Config, error) {
-    viper.SetConfigFile("config/schedule.yaml")
-    viper.SetConfigFile("config/categories.yaml")
-    viper.AutomaticEnv()
-    
-    if err := viper.ReadInConfig(); err != nil {
+    // 1. Load YAML
+    data, err := os.ReadFile(configPath)
+    if err != nil {
         return nil, fmt.Errorf("failed to read config: %w", err)
     }
-    
-    var cfg Config
-    if err := viper.Unmarshal(&cfg); err != nil {
-        return nil, err
+    if err := yaml.Unmarshal(data, cfg); err != nil {
+        return nil, fmt.Errorf("failed to parse config: %w", err)
     }
-    return &cfg, nil
+
+    // 2. Override with env vars
+    if v := os.Getenv("TELEGRAM_BOT_TOKEN"); v != "" {
+        cfg.Telegram.BotToken = v
+    }
+    if v := os.Getenv("DATABASE_URL"); v != "" {
+        cfg.Database.URL = v
+    }
+    // ... other env overrides
+
+    return cfg, nil
+}
+
+// Hot-reload via fsnotify (debounced 100ms)
+func WatchConfig(configPath string, onChange func(*Config)) error {
+    watcher, _ := fsnotify.NewWatcher()
+    watcher.Add(configPath)
+    go func() {
+        var debounce *time.Timer
+        for event := range watcher.Events {
+            if event.Op&fsnotify.Write == fsnotify.Write {
+                if debounce != nil {
+                    debounce.Stop()
+                }
+                debounce = time.AfterFunc(100*time.Millisecond, func() {
+                    if cfg, err := LoadConfig(configPath); err == nil {
+                        onChange(cfg)
+                    }
+                })
+            }
+        }
+    }()
+    return nil
 }
 ```
 

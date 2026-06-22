@@ -17,14 +17,13 @@ import (
 	"github.com/navisha/spark/internal/content"
 	"github.com/navisha/spark/internal/database"
 	"github.com/navisha/spark/internal/database/repository"
-	"github.com/navisha/spark/internal/retry"
 	"github.com/navisha/spark/internal/rotation"
 	"github.com/navisha/spark/internal/scheduler"
 	"github.com/navisha/spark/internal/telegram"
 )
 
 func main() {
-	// Load .env file
+	// Load .env file (warn only; env vars may be set directly in production)
 	if err := godotenv.Load(); err != nil {
 		fmt.Printf("Warning: failed to load .env file: %v\n", err)
 	}
@@ -61,7 +60,6 @@ func main() {
 	insightRepo := repository.NewInsightRepository(db.DB)
 	rotationRepo := repository.NewRotationRepository(db.DB)
 	historyRepo := repository.NewHistoryRepository(db.DB)
-	_ = repository.NewDeliveryRepository(db.DB) // Initialize but not used in current flow
 
 	// Initialize Telegram client
 	telegramCfg := telegram.Config{
@@ -85,12 +83,6 @@ func main() {
 		IncludeTags:      cfg.Format.IncludeTags,
 		MarkdownEnabled:  cfg.Format.MarkdownEnabled,
 	})
-
-	// Initialize retry policy
-	_ = retry.NewPolicy(
-		cfg.Retry.MaxRetries,
-		parseDelays(cfg.Retry.Delays),
-	)
 
 	// Initialize content generator
 	contentGen := content.NewGenerator(
@@ -148,8 +140,7 @@ func main() {
 
 	// Add job to scheduler
 	if err := sched.AddJob("send_insight", cfg.Schedule.Cron, func() {
-		err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute)
-		if err != nil {
+		if err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute); err != nil {
 			logger.WithError(err).Error("insight delivery job failed")
 		}
 	}); err != nil {
@@ -185,15 +176,13 @@ func main() {
 				"new_cron": newCron,
 			}).Info("updating scheduler cron expression")
 
-			// Remove old job and add with new cron
 			if err := sched.RemoveJob("send_insight"); err != nil {
 				logger.WithError(err).Error("failed to remove old job")
 				return
 			}
 
 			if err := sched.AddJob("send_insight", newCron, func() {
-				err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute)
-				if err != nil {
+				if err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute); err != nil {
 					logger.WithError(err).Error("insight delivery job failed")
 				}
 			}); err != nil {
@@ -204,7 +193,6 @@ func main() {
 			logger.Info("scheduler cron expression updated successfully")
 		}
 
-		// Update the global config reference
 		cfg = newCfg
 	}); err != nil {
 		logger.WithError(err).Warn("failed to setup config watcher")
@@ -215,8 +203,6 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	logger.Info("application started successfully, waiting for shutdown signal")
-
-	// Block until signal received
 	<-quit
 
 	logger.Info("shutting down application...")
@@ -226,8 +212,7 @@ func main() {
 	defer shutdownCancel()
 
 	// Stop scheduler
-	schedCtx := sched.Stop()
-	if schedCtx != nil {
+	if schedCtx := sched.Stop(); schedCtx != nil {
 		<-schedCtx.Done()
 	}
 	logger.Info("scheduler stopped")
@@ -246,14 +231,12 @@ func main() {
 func setupLogger(cfg *config.Config) *logrus.Entry {
 	logger := logrus.New()
 
-	// Set log level
 	level, err := logrus.ParseLevel(cfg.App.LogLevel)
 	if err != nil {
 		level = logrus.InfoLevel
 	}
 	logger.SetLevel(level)
 
-	// Set log format
 	if cfg.Logging.Format == "json" {
 		logger.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: time.RFC3339,
@@ -268,7 +251,7 @@ func setupLogger(cfg *config.Config) *logrus.Entry {
 	return logger.WithField("app", cfg.App.Name)
 }
 
-// setupHealthServer creates the HTTP server for health checks.
+// setupHealthServer creates the HTTP server for health checks and manual trigger.
 func setupHealthServer(
 	db *sqlx.DB,
 	telegramClient *telegram.Client,
@@ -279,52 +262,42 @@ func setupHealthServer(
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		health := map[string]interface{}{
-			"status":    "ok",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		}
+		status := "ok"
+		dbStatus := "healthy"
+		tgStatus := "healthy"
 
-		// Check database connection
 		if err := db.Ping(); err != nil {
 			logger.WithError(err).Error("health check: database ping failed")
-			health["status"] = "degraded"
-			health["database"] = "unhealthy"
-		} else {
-			health["database"] = "healthy"
+			status = "degraded"
+			dbStatus = "unhealthy"
 		}
 
-		// Check Telegram API
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		checkCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-
-		if err := telegramClient.HealthCheck(ctx); err != nil {
+		if err := telegramClient.HealthCheck(checkCtx); err != nil {
 			logger.WithError(err).Warn("health check: Telegram API unreachable")
-			health["telegram"] = "unhealthy"
-			// Don't mark as degraded for Telegram, just log warning
-		} else {
-			health["telegram"] = "healthy"
+			tgStatus = "unhealthy"
 		}
 
-		// Set content type and write response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-
-		// Write JSON response
-		fmt.Fprintf(w, `{"status":"%s","timestamp":"%s","database":"%s","telegram":"%s"}`,
-			health["status"],
-			health["timestamp"],
-			health["database"],
-			health["telegram"],
+		fmt.Fprintf(w, `{"status":%q,"timestamp":%q,"database":%q,"telegram":%q}`,
+			status,
+			time.Now().UTC().Format(time.RFC3339),
+			dbStatus,
+			tgStatus,
 		)
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Navisha Spark is running")
+		fmt.Fprint(w, "Navisha Spark is running")
 	})
 
+	// /trigger accepts GET only; protected by Nginx rate-limiting in production.
+	// For local/dev use, combine with basic auth or IP restriction as needed.
 	mux.HandleFunc("/trigger", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodPost && r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
@@ -332,16 +305,16 @@ func setupHealthServer(
 		logger.Info("manual trigger received")
 
 		go func() {
-			err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute)
-			if err != nil {
+			if err := sendInsightJob.ExecuteWithTimeout(2 * time.Minute); err != nil {
 				logger.WithError(err).Error("manual trigger failed")
 			} else {
 				logger.Info("manual trigger completed successfully")
 			}
 		}()
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusAccepted)
-		fmt.Fprintf(w, `{"status":"accepted","message":"insight delivery started"}`)
+		fmt.Fprint(w, `{"status":"accepted","message":"insight delivery started"}`)
 	})
 
 	return &http.Server{
@@ -359,7 +332,6 @@ func parseDelays(delays []string) []time.Duration {
 	for i, d := range delays {
 		duration, err := time.ParseDuration(d)
 		if err != nil {
-			// Default to 1 minute if parsing fails
 			duration = time.Minute
 		}
 		result[i] = duration
@@ -367,7 +339,7 @@ func parseDelays(delays []string) []time.Duration {
 	return result
 }
 
-// getEnabledCategories returns a list of enabled category names.
+// getEnabledCategories returns names of all enabled categories.
 func getEnabledCategories(categories []config.Category) []string {
 	var enabled []string
 	for _, cat := range categories {

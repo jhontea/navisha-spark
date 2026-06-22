@@ -10,22 +10,22 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang mengirimkan in
 ┌─────────────────────────────────────────────────────────────────┐
 │                         cmd/spark/main.go                        │
 │                         (Entry Point)                            │
-└────────────────────────────┬────────────────────────────────────┘
+└────────────────────────────┤────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      internal/ (Core Logic)                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐  │
 │  │   config/    │  │  scheduler/  │  │     telegram/        │  │
 │  │  (Config     │  │  (Cron       │  │  (Telegram Bot API   │  │
 │  │   Loading)   │  │   Trigger)   │  │   Client)            │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  └──────────────┘  └──────────────┘  └────────────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐  │
 │  │   content/   │  │  rotation/   │  │     database/        │  │
 │  │  (LLM +      │  │  (Topic      │  │  (PostgreSQL         │  │
 │  │   Content    │  │   Selection) │  │   Repository)        │  │
 │  │   Bank)      │  │              │  │                      │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  └──────────────┘  └──────────────┘  └────────────────────┘  │
 │  ┌──────────────┐                                              │
 │  │   retry/     │                                              │
 │  │  (Exponential│                                              │
@@ -36,11 +36,11 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang mengirimkan in
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    External Dependencies                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐  │
 │  │  PostgreSQL  │  │  Telegram    │  │   OpenRouter LLM     │  │
 │  │  (Supabase)  │  │  Bot API     │  │   (openrouter/owl-   │  │
 │  │              │  │              │  │    alpha)             │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  └──────────────┘  └──────────────┘  └────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,51 +48,50 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang mengirimkan in
 
 ### 1. Entry Point (`cmd/spark/main.go`)
 - Initialize application
-- Load configuration
+- Load configuration (`config/config.yaml` + env vars)
 - Setup database connection
 - Start scheduler
+- Start health check HTTP server (`/healthz`, `/trigger`)
+- Handle hot-reload via `config.WatchConfig`
 - Handle graceful shutdown
 
 ### 2. Config Layer (`internal/config/`)
-- Load environment variables (viper)
-- Parse YAML configs (categories, schedule)
+- Load environment variables via `os.Getenv`
+- Parse unified YAML config (`config/config.yaml`)
 - Provide typed configuration structs
-- Hot-reload support for YAML files
+- Hot-reload support via `fsnotify` debounced watcher
 
 ### 3. Scheduler Layer (`internal/scheduler/`)
 - Wrapper around `robfig/cron/v3`
 - Timezone handling (Asia/Jakarta)
 - Active hours validation
-- Trigger content delivery job
+- `SendInsightJob` — orchestrates the full delivery flow
 
 ### 4. Telegram Layer (`internal/telegram/`)
 - Telegram Bot API client
-- Message formatting (Markdown)
-- Send message with retry logic
+- Message formatting (Markdown) with split support (>4096 chars)
 - Chat ID whitelist validation
 
 ### 5. Content Layer (`internal/content/`)
-- Insight bank management
-- LLM integration (OpenRouter)
-- Prompt template management
-- Content validation
+- LLM integration (OpenRouter REST API, no SDK)
+- Prompt builder: insight, variation, follow-up prompts
+- Content validator
 
 ### 6. Rotation Layer (`internal/rotation/`)
 - Weighted round-robin category selection
 - Level distribution (beginner/intermediate/advanced)
-- Deduplication logic (24h window)
-- Spaced repetition heuristic
+- Deduplication logic (configurable window)
+- Spaced repetition heuristic (SM-2 inspired)
 
 ### 7. Database Layer (`internal/database/`)
 - PostgreSQL connection pool (sqlx)
-- Repository pattern for data access
-- Transaction management
-- Migration runner
+- Repository pattern: `InsightRepository`, `RotationRepository`, `HistoryRepository`, `DeliveryRepository`
+- Migration runner (`internal/database/migration/runner.go`)
 
 ### 8. Retry Layer (`internal/retry/`)
-- Exponential backoff implementation
+- Exponential backoff, fixed, incremental, and list-based backoff strategies
 - Retry policy configuration
-- Error classification (retryable vs non-retryable)
+- Generic `DoWithData[T]` for type-safe retries
 
 ## Data Flow
 
@@ -100,21 +99,23 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang mengirimkan in
 ```
 1. Scheduler triggers (every 3 hours)
 2. Rotation Engine selects category + level
-3. Database queries for eligible insight
-4. If found: use curated insight
-   If not found: generate via LLM
-5. Telegram sends message
-6. Log delivery to database
-7. Update rotation state
+3. InsightRepository queries for eligible insight (not sent in dedup window)
+4. If found: use curated insight from bank
+   If not found: generate via LLM (OpenRouter)
+5. Validate generated content
+6. Save generated insight to database
+7. Format message with Telegram Formatter (split if >4096 chars)
+8. Send via Telegram Bot API
+9. Record delivery: update rotation_state, insights.times_sent, sent_history
 ```
 
 ### Retry Flow (Failure)
 ```
 1. Scheduler triggers
-2. Rotation Engine selects question
+2. Rotation Engine selects insight
 3. Telegram send fails
 4. Retry with exponential backoff (1m, 5m, 15m)
-5. If success: log and continue
+5. If success: log and record delivery
 6. If all retries fail: log error, skip to next schedule
 ```
 
@@ -123,77 +124,94 @@ Navisha Spark adalah sistem pembelajaran backend engineering yang mengirimkan in
 ### 1. Why Clean Architecture?
 - **Testability:** Each layer can be tested independently
 - **Maintainability:** Clear separation of concerns
-- **Flexibility:** Easy to swap implementations (e.g., Telegram → Discord)
+- **Flexibility:** Easy to swap implementations
 
 ### 2. Why sqlx instead of GORM?
 - **Control:** Full control over SQL queries
 - **Performance:** No ORM overhead
 - **Transparency:** Explicit queries, easier to debug
-- **Type Safety:** Struct mapping without magic
 
 ### 3. Why robfig/cron instead of systemd timer?
-- **Portability:** Works on any OS (Windows, Linux, macOS)
-- **Flexibility:** Easy to change schedule without OS config
+- **Portability:** Works on any OS
 - **State Management:** Rotation state in PostgreSQL persists across restarts
 - **Simplicity:** Single binary, no external dependencies
 
-### 4. Why PostgreSQL (Supabase)?
-- **Managed:** No need to manage database server
-- **Reliable:** Auto-backup, high availability
-- **Scalable:** Can handle growth if needed
-- **Cost-effective:** Free tier sufficient for single user
+### 4. Why no Viper?
+- Viper is not used. Config is loaded via `yaml.v3` + `os.Getenv` directly.
+- Lighter approach, fully typed structs, hot-reload via `fsnotify`.
 
-### 5. Why OpenRouter?
-- **Unified API:** Single API for multiple LLM providers
-- **Free Models:** Access to free models (Mistral, Llama, Phi-3)
-- **Fallback:** Easy to switch models without code changes
-- **Cost Control:** Monitor usage via dashboard
+### 5. Why parameterized SQL intervals?
+- `($1 * INTERVAL '1 hour')` instead of `($1 || ' hours')::INTERVAL`
+- Parameterized prevents SQL injection and is more idiomatic PostgreSQL.
 
 ## Package Structure
 
 ```
 internal/
 ├── config/
-│   ├── config.go           # Main config struct
-│   ├── loader.go           # Load from env + YAML
-│   └── types.go            # Type definitions
+│   ├── config.go           # LoadConfig, WatchConfig, hot-reload
+│   ├── loader.go           # GetEnv, GetEnvInt, GetEnvBool, MustConfig
+│   └── types.go            # All config struct types
 │
 ├── scheduler/
 │   ├── scheduler.go        # Cron wrapper
-│   ├── job.go              # Job definition
-│   └── timezone.go         # Timezone handling
+│   ├── job.go              # SendInsightJob (main orchestration logic)
+│   └── timezone.go         # Timezone helpers
 │
 ├── telegram/
 │   ├── client.go           # Telegram API client
-│   ├── formatter.go        # Markdown formatter
-│   └── whitelist.go        # Chat ID validation
+│   ├── formatter.go        # Markdown formatter + message splitting
+│   ├── formatter_test.go   # Unit tests for formatter
+│   └── whitelist.go        # Chat ID whitelist
 │
 ├── content/
-│   ├── bank.go             # Question bank
-│   ├── generator.go        # LLM generator
-│   ├── prompt.go           # Prompt templates
-│   └── validator.go        # Content validation
+│   ├── generator.go        # OpenRouter LLM client
+│   ├── prompt.go           # Prompt templates (insight, variation, follow-up)
+│   └── validator.go        # Content validation & repair
 │
 ├── rotation/
-│   ├── engine.go           # Rotation logic
-│   ├── selector.go         # Category/level selector
-│   ├── dedup.go            # Deduplication
-│   └── spaced_repetition.go # Heuristic logic
+│   ├── engine.go           # Rotation logic (SelectNext, RecordDelivery)
+│   ├── selector.go         # Level selection (weighted random)
+│   ├── dedup.go            # Deduplication helpers
+│   └── spaced_repetition.go # SM-2 inspired heuristics
 │
 ├── database/
 │   ├── connection.go       # DB connection pool
 │   ├── repository/
-│   │   ├── question.go     # Question CRUD
+│   │   ├── insight.go      # Insight CRUD
 │   │   ├── delivery.go     # Delivery log
 │   │   ├── rotation.go     # Rotation state
-│   │   └── history.go      # Sent history
+│   │   └── history.go      # Sent history (dedup)
 │   └── migration/
 │       └── runner.go       # Migration runner
 │
 └── retry/
-    ├── retry.go            # Retry logic
-    ├── backoff.go          # Exponential backoff
-    └── policy.go           # Retry policy
+    ├── retry.go            # Do, DoWithData[T] generic retry
+    ├── backoff.go          # ExponentialBackoff, ListBackoff, FixedBackoff
+    └── policy.go           # Policy struct, DefaultRetryableFn
+```
+
+## Database Schema
+
+```
+insights
+├── id, category, level, title, insight
+├── key              -- subtopic identifier (kebab-case slug)
+├── key_points       -- TEXT[]
+├── code_example     -- nullable TEXT
+├── follow_ups       -- JSONB [{"q":"...","a":"..."}]
+├── tags             -- TEXT[]
+├── times_sent, last_sent_at, created_at, updated_at
+
+delivery_log
+├── id, insight_id, sent_at, status (success|failed|retry)
+└── error_message, telegram_message_id
+
+rotation_state
+└── category (PK), last_sent_at, total_sent, last_level, updated_at
+
+sent_history
+└── insight_id + sent_at (composite PK) -- deduplication window
 ```
 
 ## Error Handling Strategy
@@ -211,27 +229,9 @@ internal/
 - Invalid configuration
 
 ### Error Logging
-- Structured JSON format
-- Include context (category, level, question_id)
-- Log to stdout (Docker logging driver)
-- Separate error log file (optional)
-
-## Concurrency Model
-
-### Single-threaded Scheduler
-- Cron runs in main goroutine
-- Each job execution is sequential
-- No concurrent job execution (prevents race conditions)
-
-### Database Connection Pool
-- Max 10 connections (configurable)
-- Connection timeout: 5 seconds
-- Idle connection timeout: 30 seconds
-
-### Telegram API Calls
-- Sequential (one at a time)
-- Timeout: 10 seconds per request
-- Retry with backoff
+- Structured JSON format (logrus)
+- Include context: category, level, insight_id, error
+- Output: stdout/stderr (Docker logging driver)
 
 ## Security Considerations
 
@@ -242,111 +242,34 @@ internal/
 
 ### Database Security
 - Connection via SSL (Supabase pooler)
-- No hardcoded credentials
+- Parameterized queries only (no string interpolation)
 - Connection string from env var
 
 ### Telegram Security
-- Chat ID whitelist (only allow specific user)
+- Chat ID whitelist (`Whitelist` struct in `telegram/whitelist.go`)
 - Bot token in env var
-- No webhook (polling not used, only sendMessage)
+- No webhook (only outbound `sendMessage`)
 
-### LLM Security
-- API key in env var
-- Rate limiting (prevent abuse)
-- Input validation (sanitize prompts)
+### HTTP Endpoints
+- `/healthz` — public, safe (read-only DB ping)
+- `/trigger` — rate-limited via Nginx in production; fires job asynchronously
 
 ## Monitoring & Observability
 
 ### Health Check
 - Endpoint: `GET /healthz`
 - Checks: Database connection, Telegram API reachability
-- Response: JSON with status and timestamp
+- Response: JSON `{"status", "timestamp", "database", "telegram"}`
 
-### Metrics (Optional)
-- Prometheus format
-- Metrics: messages_sent, messages_failed, questions_generated
-- Endpoint: `GET /metrics`
+### Manual Trigger
+- Endpoint: `GET /trigger` or `POST /trigger`
+- Fires an immediate delivery job (async, non-blocking)
+- Returns 202 Accepted immediately
 
 ### Logging
 - Structured JSON (logrus)
-- Fields: timestamp, level, message, category, question_id, error
+- Fields: timestamp, level, message, category, insight_id, error
 - Output: stdout/stderr
-
-## Deployment Model
-
-### Docker Compose
-```yaml
-services:
-  spark:
-    build: .
-    restart: unless-stopped
-    healthcheck: ...
-```
-
-### Environment
-- Production: Docker Compose on VPS
-- Development: Local Go binary with `.env`
-- Testing: Docker Compose with test database
-
-### CI/CD (Future)
-- GitHub Actions
-- Build Docker image
-- Push to registry
-- Deploy to VPS via SSH
-
-## Scalability Considerations
-
-### Current (Single User)
-- Single Go binary
-- Single PostgreSQL database
-- ~8 messages/day
-- Cost: <$10/month
-
-### Future (Multi-User)
-- Multiple chat_id whitelist
-- Per-user rotation state
-- Horizontal scaling (multiple instances)
-- Load balancer
-
-### Future (High Volume)
-- Message queue (Kafka) for delivery
-- Worker pool for LLM generation
-- Redis cache for frequent queries
-- CDN for static content
-
-## Technology Stack
-
-| Component | Technology | Reason |
-|-----------|-----------|--------|
-| Language | Go 1.23 | Performance, simplicity, concurrency |
-| Database | PostgreSQL (Supabase) | Managed, reliable, scalable |
-| Scheduler | robfig/cron v3 | Flexible, in-process |
-| Telegram | go-telegram-bot-api/v6 | Official wrapper |
-| LLM | OpenRouter | Unified API, free models |
-| Config | Viper + YAML | Hot-reload, flexible |
-| Logging | Logrus | Structured logging |
-| Database Driver | sqlx + lib/pq | Type-safe, performant |
-| Deployment | Docker Compose | Simple, portable |
-
-## Future Enhancements
-
-### v2.0
-- Web dashboard for question management
-- Multi-user support
-- Analytics dashboard
-- Export to Anki/JSON
-
-### v3.0
-- Full SRS algorithm (SM-2)
-- Image/diagram support
-- Voice notes
-- Integration with Notion/Obsidian
-
-### v4.0
-- Multi-platform (Discord, Slack)
-- Community questions
-- Gamification (streaks, points)
-- AI-powered personalization
 
 ---
 
