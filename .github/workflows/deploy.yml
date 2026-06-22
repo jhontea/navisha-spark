@@ -1,0 +1,61 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build check
+        run: CGO_ENABLED=0 go build -o /dev/null ./cmd/spark
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            cd /opt/navisha-spark
+
+            echo "Pulling latest changes..."
+            git pull origin main
+
+            echo "Rebuilding and restarting container..."
+            docker-compose -f deploy/docker-compose.prod.yml up -d --build --remove-orphans
+
+            echo "Waiting for container to be healthy..."
+            sleep 10
+
+            STATUS=$(docker inspect --format='{{.State.Status}}' navisha-spark 2>/dev/null || echo 'not found')
+            if [ "$STATUS" != "running" ]; then
+              echo "Container is not running. Status: $STATUS"
+              docker logs navisha-spark --tail 30
+              exit 1
+            fi
+
+            echo "Deployment successful! Container status: $STATUS"

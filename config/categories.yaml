@@ -371,6 +371,26 @@ categories:
       - "CAP theorem trade-offs"
       - "PACELC theorem"
 
+  - name: "Software Architecture"
+    enabled: true
+    weight: 1.0
+    subtopics:
+      - "clean architecture"
+      - "hexagonal architecture"
+      - "domain-driven design (DDD)"
+      - "SOLID principles"
+      - "design patterns"
+      - "dependency inversion"
+      - "repository pattern"
+      - "unit of work pattern"
+      - "CQRS"
+      - "event-driven design"
+      - "bounded context"
+      - "aggregate root"
+      - "value objects"
+      - "anti-corruption layer"
+      - "modular monolith"
+
   - name: "AI/ML untuk Backend Engineer"
     enabled: true
     weight: 1.0
