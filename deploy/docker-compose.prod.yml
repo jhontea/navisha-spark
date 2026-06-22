@@ -6,8 +6,8 @@ services:
       context: ..
       dockerfile: Dockerfile
     container_name: navisha-spark
-    expose:
-      - "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
     environment:
       - APP_NAME=${APP_NAME:-navisha-spark}
       - APP_ENV=${APP_ENV:-production}
@@ -40,43 +40,6 @@ services:
       - "com.navisha.service=spark"
       - "com.navisha.component=telegram-bot"
 
-  nginx:
-    image: nginx:alpine
-    container_name: navisha-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx:/etc/nginx/conf.d:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - certbot-webroot:/var/www/certbot:ro
-      - certbot-certs:/etc/letsencrypt:ro
-    restart: unless-stopped
-    depends_on:
-      - spark
-    networks:
-      - navisha-network
-    labels:
-      - "com.navisha.service=nginx"
-      - "com.navisha.component=reverse-proxy"
-
-  certbot:
-    image: certbot/certbot
-    container_name: navisha-certbot
-    volumes:
-      - certbot-webroot:/var/www/certbot
-      - certbot-certs:/etc/letsencrypt
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    networks:
-      - navisha-network
-    labels:
-      - "com.navisha.service=certbot"
-      - "com.navisha.component=ssl"
-
 networks:
   navisha-network:
     driver: bridge
-
-volumes:
-  certbot-webroot:
-  certbot-certs:
